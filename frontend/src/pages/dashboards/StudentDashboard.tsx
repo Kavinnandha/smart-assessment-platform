@@ -96,17 +96,11 @@ const StudentDashboard = () => {
       {/* Quick Actions */}
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Button className="h-24" onClick={() => window.location.href = '/tests'}>
             <div className="text-center">
               <FileText className="h-6 w-6 mx-auto mb-2" />
               <span>View Tests</span>
-            </div>
-          </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/submissions'}>
-            <div className="text-center">
-              <CheckCircle className="h-6 w-6 mx-auto mb-2" />
-              <span>My Submissions</span>
             </div>
           </Button>
           <Button className="h-24" onClick={() => window.location.href = '/reports'}>

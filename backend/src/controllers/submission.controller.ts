@@ -49,7 +49,14 @@ export const getSubmissions = async (req: AuthRequest, res: Response) => {
 
     const submissions = await Submission.find(filter)
       .populate('student', 'name email')
-      .populate('test', 'title subject totalMarks')
+      .populate({
+        path: 'test',
+        select: 'title subject totalMarks',
+        populate: {
+          path: 'subject',
+          select: 'name'
+        }
+      })
       .populate('answers.question')
       .populate('evaluatedBy', 'name email')
       .sort({ submittedAt: -1 });
@@ -65,7 +72,13 @@ export const getSubmissionById = async (req: AuthRequest, res: Response) => {
   try {
     const submission = await Submission.findById(req.params.id)
       .populate('student', 'name email')
-      .populate('test')
+      .populate({
+        path: 'test',
+        populate: {
+          path: 'questions.question subject',
+          select: 'questionNumber questionText questionImage chapter topic marks name'
+        }
+      })
       .populate('answers.question')
       .populate('evaluatedBy', 'name email');
 

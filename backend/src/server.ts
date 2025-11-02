@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import connectDB from './config/database';
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -9,6 +10,8 @@ import testRoutes from './routes/test.routes';
 import submissionRoutes from './routes/submission.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import subjectRoutes from './routes/subject.routes';
+import groupRoutes from './routes/group.routes';
+import uploadRoutes from './routes/upload.routes';
 
 dotenv.config();
 
@@ -20,6 +23,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -28,6 +34,8 @@ app.use('/api/tests', testRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/subjects', subjectRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

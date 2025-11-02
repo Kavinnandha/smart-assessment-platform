@@ -96,7 +96,7 @@ const TeacherDashboard = () => {
               <span>Create Test</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/submissions'}>
+          <Button className="h-24" onClick={() => window.location.href = '/tests/submissions'}>
             <div className="text-center">
               <ClipboardList className="h-6 w-6 mx-auto mb-2" />
               <span>Evaluate Submissions</span>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, UserPlus, Edit, Trash2, Shield, GraduationCap, BookOpen } from 'lucide-react';
+import { Users, UserPlus, Edit, Trash2, Shield, GraduationCap, BookOpen, UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,6 +16,18 @@ import api from '@/lib/api';
 interface Subject {
   _id: string;
   name: string;
+}
+
+interface Teacher {
+  _id: string;
+  name: string;
+  email: string;
+}
+
+interface Group {
+  _id: string;
+  name: string;
+  teachers: Teacher[];
 }
 
 interface User {
@@ -38,6 +50,7 @@ interface UserFormData {
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -58,6 +71,7 @@ const UsersPage = () => {
   useEffect(() => {
     fetchUsers();
     fetchSubjects();
+    fetchGroups();
   }, []);
 
   const fetchUsers = async () => {
@@ -78,6 +92,15 @@ const UsersPage = () => {
       setSubjects(response.data);
     } catch (err: any) {
       console.error('Failed to fetch subjects:', err);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const response = await api.get('/groups');
+      setGroups(response.data || []);
+    } catch (err: any) {
+      console.error('Failed to fetch groups:', err);
     }
   };
 
@@ -204,6 +227,12 @@ const UsersPage = () => {
     }
   };
 
+  const getAssignedGroups = (teacherId: string) => {
+    return groups.filter(group => 
+      group.teachers.some(teacher => teacher._id === teacherId)
+    );
+  };
+
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -326,6 +355,9 @@ const UsersPage = () => {
                   Subjects
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Assigned Groups
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -336,7 +368,7 @@ const UsersPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     No users found
                   </td>
                 </tr>
@@ -361,6 +393,34 @@ const UsersPage = () => {
                           ? user.subjects.map(s => s.name).join(', ') 
                           : '-'}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {user.role === 'teacher' ? (
+                        (() => {
+                          const assignedGroups = getAssignedGroups(user._id);
+                          return (
+                            <div className="text-sm">
+                              {assignedGroups.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {assignedGroups.map(group => (
+                                    <span 
+                                      key={group._id}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200"
+                                    >
+                                      <UsersRound className="h-3 w-3" />
+                                      {group.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">No groups assigned</span>
+                              )}
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-600">

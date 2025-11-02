@@ -23,7 +23,7 @@ export const createTest = async (req: AuthRequest, res: Response) => {
 
 export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
   try {
-    const { subject, totalMarks, easyPercentage, mediumPercentage, hardPercentage, topics, title, duration } = req.body;
+    const { subject, totalMarks, easyPercentage, mediumPercentage, hardPercentage, topics, title, duration, chapters } = req.body;
 
     // Calculate marks distribution
     const easyMarks = Math.floor(totalMarks * (easyPercentage / 100));
@@ -35,11 +35,23 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
     if (topics && topics.length > 0) {
       filter.topic = { $in: topics };
     }
+    if (chapters && chapters.length > 0) {
+      filter.chapter = { $in: chapters };
+    }
 
     // Fetch questions by difficulty
     const easyQuestions = await Question.find({ ...filter, difficultyLevel: DifficultyLevel.EASY });
     const mediumQuestions = await Question.find({ ...filter, difficultyLevel: DifficultyLevel.MEDIUM });
     const hardQuestions = await Question.find({ ...filter, difficultyLevel: DifficultyLevel.HARD });
+
+    // Check if any questions are available
+    const totalAvailableQuestions = easyQuestions.length + mediumQuestions.length + hardQuestions.length;
+    if (totalAvailableQuestions === 0) {
+      const message = chapters && chapters.length > 0 
+        ? `No questions found in the selected chapter${chapters.length > 1 ? 's' : ''}: ${chapters.join(', ')}`
+        : 'No questions found for the selected subject';
+      return res.status(404).json({ message });
+    }
 
     // Select questions to match target marks
     const selectedQuestions: any[] = [];
@@ -72,25 +84,35 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
       }
     }
 
+    // Check if we were able to select any questions
+    if (selectedQuestions.length === 0) {
+      const message = chapters && chapters.length > 0
+        ? `No suitable questions found in the selected chapter${chapters.length > 1 ? 's' : ''} matching the criteria. Try adjusting the difficulty percentages or total marks.`
+        : 'No suitable questions found matching the criteria. Try adjusting the difficulty percentages or total marks.';
+      return res.status(404).json({ message });
+    }
+
     const actualTotalMarks = currentEasyMarks + currentMediumMarks + currentHardMarks;
 
-    const test = new Test({
-      title: title || `Auto-generated ${subject} Test`,
-      subject,
-      duration: duration || 60,
-      totalMarks: actualTotalMarks,
-      questions: selectedQuestions,
-      createdBy: req.user?.userId,
-      isPublished: false
+    // Populate the selected questions with full question details
+    const populatedQuestions = await Question.find({
+      _id: { $in: selectedQuestions.map(q => q.question) }
+    }).populate('subject', 'name');
+
+    // Map the populated questions back with their marks and order
+    const questionsWithDetails = selectedQuestions.map(sq => {
+      const questionDetail = populatedQuestions.find((q: any) => q._id.toString() === sq.question.toString());
+      return {
+        question: questionDetail,
+        marks: sq.marks,
+        order: sq.order
+      };
     });
 
-    await test.save();
-    await test.populate('questions.question');
-    await test.populate('subject', 'name');
-
-    res.status(201).json({ 
-      message: 'Test auto-generated successfully', 
-      test,
+    // Return the selected questions without saving the test
+    res.status(200).json({ 
+      message: 'Questions auto-generated successfully',
+      questions: questionsWithDetails,
       distribution: {
         easy: currentEasyMarks,
         medium: currentMediumMarks,

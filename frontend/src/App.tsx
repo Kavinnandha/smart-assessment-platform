@@ -8,6 +8,7 @@ import StudentDashboard from './pages/dashboards/StudentDashboard';
 import TeacherDashboard from './pages/dashboards/TeacherDashboard';
 import AdminDashboard from './pages/dashboards/AdminDashboard';
 import QuestionsPage from './pages/questions/QuestionsPage';
+import SubjectQuestionsPage from './pages/questions/SubjectQuestionsPage';
 import CreateQuestionPage from './pages/questions/CreateQuestionPage';
 import TestsPage from './pages/tests/TestsPage';
 import CreateTestPage from './pages/tests/CreateTestPage';
@@ -17,6 +18,7 @@ import EvaluatePage from './pages/submissions/EvaluatePage';
 import ReportsPage from './pages/reports/ReportsPage';
 import UsersPage from './pages/admin/UsersPage';
 import SubjectsPage from './pages/admin/SubjectsPage';
+import StudentGroupsPage from './pages/groups/StudentGroupsPage';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
   const { user, loading } = useAuth();
@@ -66,18 +68,20 @@ function AppRoutes() {
         
         {/* Question Routes */}
         <Route path="/questions" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><QuestionsPage /></ProtectedRoute>} />
+        <Route path="/questions/subject/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><SubjectQuestionsPage /></ProtectedRoute>} />
         <Route path="/questions/create" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
+        <Route path="/questions/create/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
         <Route path="/questions/edit/:id" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
+        <Route path="/questions/edit/:id/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
         
         {/* Test Routes */}
         <Route path="/tests" element={<TestsPage />} />
         <Route path="/tests/create" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateTestPage /></ProtectedRoute>} />
         <Route path="/tests/edit/:id" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateTestPage /></ProtectedRoute>} />
-        <Route path="/tests/:id" element={<TakeTestPage />} />
-        
-        {/* Submission Routes */}
-        <Route path="/submissions" element={<SubmissionsPage />} />
-        <Route path="/submissions/:id/evaluate" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><EvaluatePage /></ProtectedRoute>} />
+        <Route path="/tests/:id" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><TakeTestPage /></ProtectedRoute>} />
+        <Route path="/tests/take/:id" element={<ProtectedRoute allowedRoles={['student']}><TakeTestPage /></ProtectedRoute>} />
+        <Route path="/tests/submissions" element={<ProtectedRoute allowedRoles={['teacher', 'admin', 'student']}><SubmissionsPage /></ProtectedRoute>} />
+        <Route path="/tests/submissions/evaluate/:id" element={<EvaluatePage />} />
         
         {/* Reports */}
         <Route path="/reports" element={<ReportsPage />} />
@@ -85,6 +89,9 @@ function AppRoutes() {
         {/* Admin Routes */}
         <Route path="/users" element={<ProtectedRoute allowedRoles={['admin']}><UsersPage /></ProtectedRoute>} />
         <Route path="/subjects" element={<ProtectedRoute allowedRoles={['admin']}><SubjectsPage /></ProtectedRoute>} />
+        
+        {/* Student Groups */}
+        <Route path="/student-groups" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><StudentGroupsPage /></ProtectedRoute>} />
       </Route>
     </Routes>
   );

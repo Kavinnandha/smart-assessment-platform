@@ -1,21 +1,21 @@
-import React from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
   FileQuestion, 
   FileText, 
-  ClipboardList, 
   BarChart3, 
   Users,
   BookOpen,
-  LogOut 
+  LogOut,
+  UsersRound
 } from 'lucide-react';
 
 const DashboardLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logout();
@@ -26,15 +26,24 @@ const DashboardLayout = () => {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student'] },
     { name: 'Questions', href: '/questions', icon: FileQuestion, roles: ['admin', 'teacher'] },
     { name: 'Tests', href: '/tests', icon: FileText, roles: ['admin', 'teacher', 'student'] },
-    { name: 'Submissions', href: '/submissions', icon: ClipboardList, roles: ['admin', 'teacher', 'student'] },
     { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'teacher', 'student'] },
     { name: 'Subjects', href: '/subjects', icon: BookOpen, roles: ['admin'] },
     { name: 'Users', href: '/users', icon: Users, roles: ['admin'] },
+    { name: 'Student Groups', href: '/student-groups', icon: UsersRound, roles: ['admin', 'teacher'] },
   ];
 
   const filteredNavigation = navigation.filter(item => 
     item.roles.includes(user?.role || '')
   );
+
+  const isActive = (href: string) => {
+    // Exact match for dashboard
+    if (href === '/dashboard') {
+      return location.pathname === '/dashboard';
+    }
+    // For other routes, check if the current path starts with the href
+    return location.pathname.startsWith(href);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -49,16 +58,23 @@ const DashboardLayout = () => {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {filteredNavigation.map((item) => (
-              <Link
-                key={item.name}
-                to={item.href}
-                className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <item.icon className="h-5 w-5" />
-                <span>{item.name}</span>
-              </Link>
-            ))}
+            {filteredNavigation.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    active 
+                      ? 'bg-blue-50 text-blue-700 font-medium' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <item.icon className={`h-5 w-5 ${active ? 'text-blue-700' : ''}`} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
           </nav>
 
           {/* User section */}

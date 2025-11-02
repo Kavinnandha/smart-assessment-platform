@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit, PlayCircle, Send, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface Question {
   _id: string;
@@ -10,12 +12,20 @@ interface Question {
     _id: string;
     questionNumber: string;
     questionText: string;
+    questionImage?: string;
     chapter: string;
     topic: string;
     difficultyLevel: string;
+    options?: string[];
+    correctAnswer?: string;
   };
   marks: number;
   order: number;
+}
+
+interface Answer {
+  question: string;
+  answer: string;
 }
 
 interface Test {
@@ -48,22 +58,123 @@ interface Test {
 const TakeTestPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const [test, setTest] = useState<Test | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  
+  // Student test-taking state
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [testStarted, setTestStarted] = useState(false);
+  
+  const isStudent = user?.role === 'student';
+  const isTakingTest = location.pathname.includes('/tests/take/');
 
   useEffect(() => {
     fetchTest();
-  }, [id]);
+    if (isStudent && isTakingTest) {
+      checkExistingSubmission();
+    }
+  }, [id, isStudent, isTakingTest]);
+
+  const checkExistingSubmission = async () => {
+    try {
+      const response = await api.get('/submissions');
+      const submissions = response.data.submissions || [];
+      const existingSubmission = submissions.find(
+        (sub: any) => sub.test === id || sub.test?._id === id
+      );
+      
+      if (existingSubmission) {
+        setAlreadySubmitted(true);
+      }
+    } catch (error) {
+      console.error('Failed to check submissions:', error);
+    }
+  };
+
+  // Timer for students
+  useEffect(() => {
+    if (testStarted && timeRemaining > 0) {
+      const timer = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [testStarted, timeRemaining]);
 
   const fetchTest = async () => {
     try {
       const response = await api.get(`/tests/${id}`);
-      setTest(response.data.test);
+      const fetchedTest = response.data.test;
+      setTest(fetchedTest);
+      
+      // Initialize answers for students
+      if (isStudent) {
+        const initialAnswers = fetchedTest.questions.map((q: Question) => ({
+          question: q.question._id,
+          answer: ''
+        }));
+        setAnswers(initialAnswers);
+      }
     } catch (error) {
       console.error('Failed to fetch test:', error);
       alert('Failed to load test details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartTest = () => {
+    if (test) {
+      setTimeRemaining(test.duration * 60); // Convert minutes to seconds
+      setTestStarted(true);
+    }
+  };
+
+  const handleAnswerChange = (questionId: string, answer: string) => {
+    setAnswers((prev) =>
+      prev.map((a) =>
+        a.question === questionId ? { ...a, answer } : a
+      )
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!test) return;
+    
+    const unanswered = answers.filter(a => !a.answer.trim()).length;
+    if (unanswered > 0) {
+      if (!window.confirm(`You have ${unanswered} unanswered question(s). Do you want to submit anyway?`)) {
+        return;
+      }
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post('/submissions', {
+        testId: test._id,
+        answers: answers,
+        timeTaken: (test.duration * 60) - timeRemaining
+      });
+      
+      alert('Test submitted successfully!');
+      navigate('/tests');
+    } catch (error: any) {
+      console.error('Failed to submit test:', error);
+      alert(error.response?.data?.message || 'Failed to submit test');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -98,6 +209,12 @@ const TakeTestPage = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto">
@@ -121,6 +238,231 @@ const TakeTestPage = () => {
     );
   }
 
+  // Student view - Test taking interface
+  if (isStudent && isTakingTest) {
+    // Check if student has already submitted this test
+    if (alreadySubmitted) {
+      return (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white p-8 rounded-lg shadow">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                <CheckCircle className="h-8 w-8 text-blue-600" />
+              </div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Test Already Submitted</h1>
+              <p className="text-lg text-gray-600 mb-6">
+                You have already submitted this test. Only one attempt is allowed.
+              </p>
+              
+              <div className="bg-blue-50 p-6 rounded-lg mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">{test?.title}</h2>
+                <p className="text-gray-600">{test?.subject?.name || 'N/A'}</p>
+              </div>
+
+              <div className="flex gap-4 justify-center">
+                <Button
+                  onClick={() => navigate('/tests')}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back to Tests
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (!testStarted) {
+      return (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white p-8 rounded-lg shadow">
+            <h1 className="text-3xl font-bold text-gray-900 mb-4">{test.title}</h1>
+            <p className="text-lg text-gray-600 mb-6">{test.subject?.name || 'N/A'}</p>
+            
+            {test.description && (
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <p className="text-gray-700">{test.description}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="flex items-center gap-2 text-gray-700">
+                <Clock className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm text-gray-500">Duration</p>
+                  <p className="font-semibold">{test.duration} minutes</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-gray-700">
+                <FileText className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm text-gray-500">Questions</p>
+                  <p className="font-semibold">{test.questions.length}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-gray-700">
+                <FileText className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm text-gray-500">Total Marks</p>
+                  <p className="font-semibold">{test.totalMarks}</p>
+                </div>
+              </div>
+              {test.deadline && (
+                <div className="flex items-center gap-2 text-gray-700">
+                  <Calendar className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="text-sm text-gray-500">Deadline</p>
+                    <p className="font-medium text-sm">{formatDate(test.deadline)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6">
+              <div className="flex gap-2">
+                <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-yellow-900 mb-2">Important Instructions:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-yellow-800 text-sm">
+                    <li>Once you start, the timer will begin automatically</li>
+                    <li>You cannot pause or restart the test</li>
+                    <li>All answers are auto-saved as you type</li>
+                    <li>Test will auto-submit when time expires</li>
+                    <li>Make sure you have stable internet connection</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/tests')}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button
+                onClick={handleStartTest}
+                className="bg-green-600 hover:bg-green-700 flex-1"
+              >
+                <PlayCircle className="h-5 w-5 mr-2" />
+                Start Test
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Test in progress
+    return (
+      <div className="max-w-5xl mx-auto">
+        {/* Timer and Header */}
+        <div className="bg-white p-4 rounded-lg shadow mb-4 sticky top-0 z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">{test.title}</h2>
+              <p className="text-sm text-gray-600">{test.subject?.name}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm text-gray-500">Time Remaining</p>
+                <p className={`text-2xl font-bold ${timeRemaining < 300 ? 'text-red-600' : 'text-green-600'}`}>
+                  {formatTime(timeRemaining)}
+                </p>
+              </div>
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {submitting ? 'Submitting...' : 'Submit Test'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Questions */}
+        <div className="space-y-6">
+          {test.questions
+            .sort((a, b) => a.order - b.order)
+            .map((item, index) => {
+              const answer = answers.find(a => a.question === item.question._id);
+              return (
+                <div key={item._id} className="bg-white p-6 rounded-lg shadow">
+                  <div className="flex gap-4">
+                    <div className="shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-lg">
+                        {index + 1}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <p className="text-lg font-medium text-gray-900 mb-2">
+                            {item.question.questionText}
+                          </p>
+                          {item.question.questionImage && (
+                            <img 
+                              src={item.question.questionImage} 
+                              alt="Question" 
+                              className="max-w-md rounded-lg border mb-4"
+                            />
+                          )}
+                          <div className="flex gap-4 text-sm text-gray-600">
+                            <span>Chapter: {item.question.chapter}</span>
+                            {item.question.topic && <span>Topic: {item.question.topic}</span>}
+                          </div>
+                        </div>
+                        <span className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium shrink-0">
+                          {item.marks} marks
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Your Answer:
+                        </label>
+                        <Textarea
+                          value={answer?.answer || ''}
+                          onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
+                          placeholder="Type your answer here..."
+                          className="min-h-32"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
+        {/* Submit Button at Bottom */}
+        <div className="mt-6 bg-white p-4 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Answered: {answers.filter(a => a.answer.trim()).length} / {test.questions.length}
+            </p>
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting}
+              size="lg"
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Send className="h-5 w-5 mr-2" />
+              {submitting ? 'Submitting...' : 'Submit Test'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Teacher view - Test details
   return (
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-4">

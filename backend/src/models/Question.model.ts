@@ -14,6 +14,12 @@ export interface IQuestion extends Document {
   difficultyLevel: DifficultyLevel;
   questionText: string;
   questionImage?: string;
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
   options?: string[];
   correctAnswer?: string;
   subject: mongoose.Types.ObjectId;
@@ -53,6 +59,24 @@ const questionSchema = new Schema<IQuestion>(
     questionImage: {
       type: String
     },
+    attachments: [{
+      fileName: {
+        type: String,
+        required: true
+      },
+      fileUrl: {
+        type: String,
+        required: true
+      },
+      fileType: {
+        type: String,
+        required: true
+      },
+      fileSize: {
+        type: Number,
+        required: true
+      }
+    }],
     options: [{
       type: String
     }],

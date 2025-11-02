@@ -283,76 +283,74 @@ export default function SubjectsPage() {
         </div>
       </div>
 
-      {/* Subjects List */}
-      <div className="space-y-3">
+      {/* Subjects Grid - Card View */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredSubjects.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500">
+          <div className="col-span-full bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500">
             No subjects found
           </div>
         ) : (
           filteredSubjects.map((subject) => (
-            <div key={subject._id} className="bg-white rounded-lg shadow-sm border">
-              {/* Subject Header */}
-              <div className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  <button
-                    onClick={() => toggleExpandSubject(subject._id)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <BookOpen className="h-5 w-5 text-blue-600" />
-                  </button>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-lg">{subject.name}</h3>
-                    <p className="text-sm text-gray-500">
-                      {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
-                    </p>
+            <div key={subject._id} className="bg-white rounded-lg shadow-md border hover:shadow-lg transition-shadow">
+              {/* Subject Card Header */}
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-blue-600" />
+                    </div>
+                  </div>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenSubjectDialog(subject)}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="h-4 w-4 text-gray-600" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenDeleteDialog(subject)}
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleExpandSubject(subject._id)}
-                    className="gap-1.5"
-                  >
-                    {expandedSubject === subject._id ? 'Collapse' : 'Expand'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenSubjectDialog(subject)}
-                    className="gap-1.5"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenDeleteDialog(subject)}
-                    className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Delete
-                  </Button>
-                </div>
+                
+                <h3 className="font-bold text-xl mb-2">{subject.name}</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
+                </p>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleExpandSubject(subject._id)}
+                  className="w-full gap-2"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {expandedSubject === subject._id ? 'Hide Chapters' : 'View Chapters'}
+                </Button>
               </div>
 
               {/* Chapters List (Expandable) */}
               {expandedSubject === subject._id && (
-                <div className="border-t px-4 py-3 bg-gray-50">
-                  <h4 className="font-medium mb-3 flex items-center gap-2">
+                <div className="border-t px-5 py-4 bg-gray-50">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm text-gray-700">
                     <FolderOpen className="h-4 w-4" />
                     Chapters
                   </h4>
                   
                   {/* Existing Chapters */}
-                  <div className="space-y-2 mb-3">
+                  <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
                     {subject.chapters.length === 0 ? (
                       <p className="text-sm text-gray-500 italic">No chapters yet</p>
                     ) : (
                       subject.chapters.map((chapter, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-white p-2 rounded border">
+                        <div key={index} className="flex items-center gap-2 bg-white p-2.5 rounded-md border">
                           {editingChapterIndex === index ? (
                             <>
                               <Input
@@ -362,42 +360,43 @@ export default function SubjectsPage() {
                                   if (e.key === 'Enter') handleSaveChapter(subject._id);
                                   if (e.key === 'Escape') setEditingChapterIndex(null);
                                 }}
-                                className="flex-1"
+                                className="flex-1 h-8"
                                 autoFocus
                               />
                               <Button
                                 size="sm"
                                 onClick={() => handleSaveChapter(subject._id)}
-                                className="gap-1"
+                                className="h-8 px-2"
                               >
                                 <Check className="h-3.5 w-3.5" />
-                                Save
                               </Button>
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setEditingChapterIndex(null)}
+                                className="h-8 px-2"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           ) : (
                             <>
-                              <span className="flex-1 text-sm">{chapter}</span>
+                              <span className="flex-1 text-sm font-medium">{chapter}</span>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => handleStartEditChapter(index, chapter)}
+                                className="h-7 w-7 p-0"
                               >
-                                <Edit className="h-3 w-3" />
+                                <Edit className="h-3.5 w-3.5" />
                               </Button>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="ghost"
                                 onClick={() => handleDeleteChapter(subject._id, index)}
-                                className="text-red-600 hover:bg-red-50"
+                                className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
                           )}
@@ -415,15 +414,16 @@ export default function SubjectsPage() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleAddChapter(subject._id);
                       }}
-                      className="flex-1"
+                      className="flex-1 h-9"
                     />
                     <Button
                       onClick={() => handleAddChapter(subject._id)}
                       disabled={!newChapter.trim()}
-                      className="gap-1.5"
+                      size="sm"
+                      className="gap-1.5 h-9"
                     >
                       <Plus className="h-4 w-4" />
-                      Add Chapter
+                      Add
                     </Button>
                   </div>
                 </div>
