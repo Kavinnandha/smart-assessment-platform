@@ -1,11 +1,31 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+export interface IChapter {
+  name: string;
+  topics: string[];
+}
+
 export interface ISubject extends Document {
   name: string;
-  chapters: string[];
+  chapters: IChapter[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const ChapterSchema = new Schema<IChapter>(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    topics: {
+      type: [String],
+      default: [],
+    },
+  },
+  { _id: false }
+);
 
 const SubjectSchema = new Schema<ISubject>(
   {
@@ -16,7 +36,7 @@ const SubjectSchema = new Schema<ISubject>(
       trim: true,
     },
     chapters: {
-      type: [String],
+      type: [ChapterSchema],
       default: [],
     },
   },

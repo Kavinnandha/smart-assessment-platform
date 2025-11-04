@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit, PlayCircle, Send, AlertCircle, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit, PlayCircle, Send, AlertCircle, CheckCircle, Download, File } from 'lucide-react';
 
 interface Question {
   _id: string;
@@ -13,6 +13,12 @@ interface Question {
     questionNumber: string;
     questionText: string;
     questionImage?: string;
+    attachments?: Array<{
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+      fileSize: number;
+    }>;
     chapter: string;
     topic: string;
     difficultyLevel: string;
@@ -64,6 +70,10 @@ const TakeTestPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  
+  // Get API base URL for file uploads
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
   
   // Student test-taking state
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -213,6 +223,109 @@ const TakeTestPage = () => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to render question text with inline attachments
+  const renderQuestionWithAttachments = (questionText: string, attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>) => {
+    if (!attachments || attachments.length === 0) {
+      return <p className="text-lg font-medium text-gray-900 mb-2">{questionText}</p>;
+    }
+
+    // Check if question text contains attachment placeholders
+    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+    const hasPlaceholders = placeholderRegex.test(questionText);
+
+    if (!hasPlaceholders) {
+      // No placeholders found, display attachments at the end (backward compatibility)
+      return (
+        <>
+          <p className="text-lg font-medium text-gray-900 mb-2">{questionText}</p>
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium text-gray-700">Attachments:</p>
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx))}
+          </div>
+        </>
+      );
+    }
+
+    // Split text by placeholders and render inline
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    const matches = questionText.matchAll(/\{\{attachment:(\d+)\}\}/g);
+
+    for (const match of matches) {
+      const matchIndex = match.index!;
+      const attachmentIndex = parseInt(match[1]);
+
+      // Add text before placeholder
+      if (matchIndex > lastIndex) {
+        parts.push(questionText.substring(lastIndex, matchIndex));
+      }
+
+      // Add attachment
+      if (attachmentIndex < attachments.length) {
+        parts.push(
+          <div key={`attachment-${attachmentIndex}`} className="my-4">
+            {renderAttachment(attachments[attachmentIndex], attachmentIndex)}
+          </div>
+        );
+      }
+
+      lastIndex = matchIndex + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < questionText.length) {
+      parts.push(questionText.substring(lastIndex));
+    }
+
+    return (
+      <div className="text-lg font-medium text-gray-900 mb-2">
+        {parts.map((part, idx) => 
+          typeof part === 'string' ? <span key={idx}>{part}</span> : part
+        )}
+      </div>
+    );
+  };
+
+  const renderAttachment = (attachment: {
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }, idx: number) => {
+    return (
+      <div key={idx} className="inline-block w-full">
+        {attachment.fileType.startsWith('image/') ? (
+          <div className="space-y-2">
+            <img 
+              src={`${FILE_BASE_URL}${attachment.fileUrl}`}
+              alt={attachment.fileName}
+              className="max-w-2xl rounded-lg border shadow-sm"
+            />
+            <p className="text-xs text-gray-500">{attachment.fileName}</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 border rounded-lg max-w-md">
+            <File className="w-5 h-5 text-gray-500 shrink-0" />
+            <a 
+              href={`${FILE_BASE_URL}${attachment.fileUrl}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline truncate flex-1"
+            >
+              {attachment.fileName}
+            </a>
+            <Download className="w-4 h-4 text-gray-400" />
+          </div>
+        )}
+      </div>
+    );
   };
 
   if (loading) {
@@ -403,9 +516,7 @@ const TakeTestPage = () => {
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <p className="text-lg font-medium text-gray-900 mb-2">
-                            {item.question.questionText}
-                          </p>
+                          {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}
                           {item.question.questionImage && (
                             <img 
                               src={item.question.questionImage} 
@@ -609,15 +720,23 @@ const TakeTestPage = () => {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
+                      <div className="flex-1">
                         <p className="text-sm text-gray-500">
                           Q{item.question.questionNumber}
                         </p>
-                        <p className="font-medium text-gray-900 mt-1">
-                          {item.question.questionText}
-                        </p>
+                        <div className="mt-1">
+                          {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}
+                        </div>
+                        {/* Display question image if exists */}
+                        {item.question.questionImage && (
+                          <img 
+                            src={item.question.questionImage} 
+                            alt="Question" 
+                            className="max-w-md rounded-lg border mt-2"
+                          />
+                        )}
                       </div>
-                      <span className="ml-4 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium">
+                      <span className="ml-4 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium shrink-0">
                         {item.marks} marks
                       </span>
                     </div>

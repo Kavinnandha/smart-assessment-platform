@@ -4,12 +4,17 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, X, FileText, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, FileText } from 'lucide-react';
+
+interface Chapter {
+  name: string;
+  topics: string[];
+}
 
 interface Subject {
   _id: string;
   name: string;
-  chapters: string[];
+  chapters: Chapter[];
 }
 
 interface Attachment {
@@ -29,6 +34,7 @@ const CreateQuestionPage = () => {
   const [loading, setLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [showAttachmentHelper, setShowAttachmentHelper] = useState(false);
   const [formData, setFormData] = useState({
     questionNumber: '',
     chapter: '',
@@ -36,8 +42,12 @@ const CreateQuestionPage = () => {
     marks: '',
     difficultyLevel: 'easy',
     questionText: '',
-    subject: ''
+    subject: '',
+    questionType: 'short-answer',
+    correctAnswer: '',
+    attachmentPosition: 'after'
   });
+  const [options, setOptions] = useState<string[]>(['', '', '', '']); // For MCQ and True/False
 
   useEffect(() => {
     fetchSubjects();
@@ -85,8 +95,16 @@ const CreateQuestionPage = () => {
         marks: question.marks?.toString() || '',
         difficultyLevel: question.difficultyLevel || 'easy',
         questionText: question.questionText || '',
-        subject: question.subject?._id || ''
+        subject: question.subject?._id || '',
+        questionType: question.questionType || 'short-answer',
+        correctAnswer: question.correctAnswer || '',
+        attachmentPosition: question.attachmentPosition || 'after'
       });
+
+      // Load options for MCQ/True-False
+      if (question.options && question.options.length > 0) {
+        setOptions(question.options);
+      }
 
       // Load attachments if they exist
       if (question.attachments && question.attachments.length > 0) {
@@ -120,12 +138,46 @@ const CreateQuestionPage = () => {
     setFormData({ 
       ...formData, 
       subject: subjectId,
-      chapter: '' // Reset chapter when subject changes
+      chapter: '', // Reset chapter when subject changes
+      topic: '' // Reset topic when subject changes
     });
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+
+    // Reset topic when chapter changes
+    if (name === 'chapter') {
+      setFormData(prev => ({ ...prev, chapter: value, topic: '' }));
+    }
+
+    // Update options based on question type
+    if (name === 'questionType') {
+      if (value === 'true-false') {
+        setOptions(['True', 'False']);
+      } else if (value === 'multiple-choice') {
+        setOptions(['', '', '', '']);
+      } else {
+        setOptions([]);
+      }
+    }
+  };
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...options];
+    newOptions[index] = value;
+    setOptions(newOptions);
+  };
+
+  const addOption = () => {
+    setOptions([...options, '']);
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length > 2) {
+      setOptions(options.filter((_, i) => i !== index));
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,6 +222,32 @@ const CreateQuestionPage = () => {
     setAttachments(attachments.filter((_, i) => i !== index));
   };
 
+  const insertAttachmentPlaceholder = (attachmentIndex: number) => {
+    const placeholder = `{{attachment:${attachmentIndex}}}`;
+    const textarea = document.getElementById('questionText') as HTMLTextAreaElement;
+    
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = formData.questionText;
+      const newText = text.substring(0, start) + placeholder + text.substring(end);
+      
+      setFormData({ ...formData, questionText: newText });
+      
+      // Set cursor position after the inserted placeholder
+      setTimeout(() => {
+        textarea.focus();
+        const newPosition = start + placeholder.length;
+        textarea.setSelectionRange(newPosition, newPosition);
+      }, 0);
+    }
+  };
+
+  const getAttachmentPlaceholderPreview = () => {
+    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+    return formData.questionText.match(placeholderRegex) || [];
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -179,12 +257,23 @@ const CreateQuestionPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation for question types
+    if ((formData.questionType === 'multiple-choice' || formData.questionType === 'true-false') && options.some(opt => opt.trim() === '')) {
+      alert('Please fill all options');
+      return;
+    }
+
     try {
       setLoading(true);
       const payload = {
         ...formData,
         marks: Number(formData.marks),
-        attachments: attachments
+        attachments: attachments,
+        options: (formData.questionType === 'multiple-choice' || formData.questionType === 'true-false') ? options : undefined,
+        questionType: formData.questionType,
+        correctAnswer: formData.correctAnswer,
+        attachmentPosition: formData.attachmentPosition
       };
 
       if (isEditMode) {
@@ -262,8 +351,8 @@ const CreateQuestionPage = () => {
                 <option value="" className="text-gray-900">Select Chapter</option>
                 {selectedSubject?.chapters && selectedSubject.chapters.length > 0 ? (
                   selectedSubject.chapters.map((chapter, index) => (
-                    <option key={index} value={chapter} className="text-gray-900 py-2">
-                      {chapter}
+                    <option key={index} value={chapter.name} className="text-gray-900 py-2">
+                      {chapter.name}
                     </option>
                   ))
                 ) : null}
@@ -298,8 +387,8 @@ const CreateQuestionPage = () => {
               <option value="" className="text-gray-900">Select Chapter</option>
               {selectedSubject?.chapters && selectedSubject.chapters.length > 0 ? (
                 selectedSubject.chapters.map((chapter, index) => (
-                  <option key={index} value={chapter} className="text-gray-900 py-2">
-                    {chapter}
+                  <option key={index} value={chapter.name} className="text-gray-900 py-2">
+                    {chapter.name}
                   </option>
                 ))
               ) : null}
@@ -317,14 +406,31 @@ const CreateQuestionPage = () => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="topic">Topic (Optional)</Label>
-            <Input
+            <Label htmlFor="topic">Topic *</Label>
+            <select
               id="topic"
               name="topic"
               value={formData.topic}
               onChange={handleChange}
-              placeholder="e.g., Linear Equations"
-            />
+              required
+              disabled={!formData.chapter}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Topic</option>
+              {selectedSubject?.chapters
+                .find(ch => ch.name === formData.chapter)
+                ?.topics.map((topic, index) => (
+                  <option key={index} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+            </select>
+            {!formData.chapter && (
+              <p className="text-sm text-gray-500 mt-1">Select a chapter first</p>
+            )}
+            {formData.chapter && selectedSubject?.chapters.find(ch => ch.name === formData.chapter)?.topics.length === 0 && (
+              <p className="text-sm text-amber-600 mt-1">⚠️ No topics available for this chapter. Please add topics in Subject Management.</p>
+            )}
           </div>
           <div>
             <Label htmlFor="questionNumber">Question Number *</Label>
@@ -341,7 +447,7 @@ const CreateQuestionPage = () => {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="marks">Marks</Label>
+            <Label htmlFor="marks">Marks *</Label>
             <Input
               id="marks"
               name="marks"
@@ -353,13 +459,14 @@ const CreateQuestionPage = () => {
             />
           </div>
           <div>
-            <Label htmlFor="difficultyLevel">Difficulty Level</Label>
+            <Label htmlFor="difficultyLevel">Difficulty Level *</Label>
             <select
               id="difficultyLevel"
               name="difficultyLevel"
               value={formData.difficultyLevel}
               onChange={handleChange}
-              className="flex h-10 w-full rounded-md border px-3 py-2"
+              required
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
@@ -369,7 +476,37 @@ const CreateQuestionPage = () => {
         </div>
 
         <div>
-          <Label htmlFor="questionText">Question Text</Label>
+          <Label htmlFor="questionType">Question Type *</Label>
+          <select
+            id="questionType"
+            name="questionType"
+            value={formData.questionType}
+            onChange={handleChange}
+            required
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="multiple-choice">Multiple Choice</option>
+            <option value="true-false">True or False</option>
+            <option value="short-answer">Short Answer</option>
+            <option value="long-answer">Long Answer</option>
+          </select>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <Label htmlFor="questionText">Question Text *</Label>
+            {attachments.length > 0 && formData.attachmentPosition === 'custom' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAttachmentHelper(!showAttachmentHelper)}
+                className="text-xs"
+              >
+                {showAttachmentHelper ? 'Hide' : 'Show'} Attachment Inserter
+              </Button>
+            )}
+          </div>
           <textarea
             id="questionText"
             name="questionText"
@@ -377,14 +514,209 @@ const CreateQuestionPage = () => {
             onChange={handleChange}
             required
             rows={6}
-            className="flex w-full rounded-md border px-3 py-2"
-            placeholder="Enter your question here..."
+            className="flex w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder={
+              attachments.length > 0 && formData.attachmentPosition === 'custom'
+                ? "Enter your question here... Use {{attachment:0}}, {{attachment:1}}, etc. to place attachments at specific positions."
+                : "Enter your question here..."
+            }
           />
+          {attachments.length > 0 && formData.attachmentPosition === 'custom' && (
+            <div className="mt-2 text-xs text-gray-600 bg-blue-50 border border-blue-200 rounded-md p-3">
+              <p className="font-semibold mb-1">💡 Custom Positioning Active:</p>
+              <p className="mb-2">
+                Type <code className="bg-white px-1 py-0.5 rounded border">{'{{attachment:0}}'}</code>, 
+                <code className="bg-white px-1 py-0.5 rounded border ml-1">{'{{attachment:1}}'}</code>, etc. 
+                in your question text to place attachments at custom positions, or use the "Show Attachment Inserter" button.
+              </p>
+              {getAttachmentPlaceholderPreview().length > 0 && (
+                <p className="text-green-700">
+                  ✓ Found {getAttachmentPlaceholderPreview().length} placeholder(s) in your question
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Attachment Inserter Helper - Only show when custom position is selected */}
+        {showAttachmentHelper && attachments.length > 0 && formData.attachmentPosition === 'custom' && (
+          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+            <Label className="text-sm font-semibold mb-3 block">Quick Insert Attachment</Label>
+            <p className="text-xs text-gray-600 mb-3">
+              Click the cursor in the question text where you want to insert an attachment, then click a button below:
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {attachments.map((attachment, index) => (
+                <Button
+                  key={index}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => insertAttachmentPlaceholder(index)}
+                  className="text-xs flex items-center gap-2 justify-start"
+                >
+                  <span className="font-mono bg-white px-1.5 py-0.5 rounded border">
+                    {index}
+                  </span>
+                  <span className="truncate">{attachment.fileName}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Options for Multiple Choice and True/False */}
+        {(formData.questionType === 'multiple-choice' || formData.questionType === 'true-false') && (
+          <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+            <Label className="text-base font-semibold mb-3 block">
+              Options * {formData.questionType === 'true-false' ? '(True/False)' : ''}
+            </Label>
+            <div className="space-y-2">
+              {options.map((option, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-600 w-8">
+                    {String.fromCharCode(65 + index)}.
+                  </span>
+                  <Input
+                    value={option}
+                    onChange={(e) => handleOptionChange(index, e.target.value)}
+                    required
+                    placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                    disabled={formData.questionType === 'true-false'}
+                    className="flex-1"
+                  />
+                  {formData.questionType === 'multiple-choice' && options.length > 2 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeOption(index)}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {formData.questionType === 'multiple-choice' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addOption}
+                className="mt-2"
+              >
+                + Add Option
+              </Button>
+            )}
+          </div>
+        )}
+
+        <div>
+          <Label htmlFor="correctAnswer">Correct Answer *</Label>
+          {formData.questionType === 'multiple-choice' ? (
+            <select
+              id="correctAnswer"
+              name="correctAnswer"
+              value={formData.correctAnswer}
+              onChange={handleChange}
+              required
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Correct Answer</option>
+              {options.map((option, index) => (
+                <option key={index} value={option}>
+                  {String.fromCharCode(65 + index)}. {option}
+                </option>
+              ))}
+            </select>
+          ) : formData.questionType === 'true-false' ? (
+            <select
+              id="correctAnswer"
+              name="correctAnswer"
+              value={formData.correctAnswer}
+              onChange={handleChange}
+              required
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Select Correct Answer</option>
+              <option value="True">True</option>
+              <option value="False">False</option>
+            </select>
+          ) : (
+            <textarea
+              id="correctAnswer"
+              name="correctAnswer"
+              value={formData.correctAnswer}
+              onChange={handleChange}
+              required
+              rows={formData.questionType === 'long-answer' ? 6 : 3}
+              className="flex w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter the correct answer or model answer..."
+            />
+          )}
         </div>
 
         {/* Attachments Section */}
         <div className="border-t pt-4">
-          <Label className="text-base font-semibold mb-3 block">Attachments (Optional)</Label>
+          <div className="flex items-center justify-between mb-3">
+            <Label className="text-base font-semibold">Attachments (Optional)</Label>
+            {attachments.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="attachmentPosition" className="text-sm">Position:</Label>
+                <select
+                  id="attachmentPosition"
+                  name="attachmentPosition"
+                  value={formData.attachmentPosition}
+                  onChange={handleChange}
+                  className="text-sm rounded-md border border-gray-300 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="before">Before Question</option>
+                  <option value="after">After Question (Default)</option>
+                  <option value="custom">Custom (use placeholders)</option>
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Show helper text based on position */}
+          {attachments.length > 0 && (
+            <div className="mb-3 text-xs bg-blue-50 border border-blue-200 rounded-md p-3">
+              {formData.attachmentPosition === 'before' && (
+                <div>
+                  <p className="font-semibold text-blue-900 mb-1">📍 Before Question</p>
+                  <p className="text-blue-700">Attachments will appear before the question text.</p>
+                </div>
+              )}
+              {formData.attachmentPosition === 'after' && (
+                <div>
+                  <p className="font-semibold text-blue-900 mb-1">📍 After Question (Default)</p>
+                  <p className="text-blue-700">Attachments will appear after the question text.</p>
+                </div>
+              )}
+              {formData.attachmentPosition === 'custom' && (
+                <div>
+                  <p className="font-semibold text-blue-900 mb-1">📍 Custom Position</p>
+                  <p className="text-blue-700 mb-2">
+                    Place attachments anywhere in your question text using placeholders:
+                  </p>
+                  <div className="space-y-1">
+                    {attachments.map((_, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <code className="bg-white px-2 py-1 rounded border border-blue-300 font-mono">
+                          {'{{attachment:' + index + '}}'}
+                        </code>
+                        <span className="text-blue-600">→ {attachments[index].fileName}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-blue-700 mt-2">
+                    Type these placeholders in your question text or use the "Show Attachment Inserter" button above.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* File Upload Button */}
           <div className="mb-4">
@@ -409,44 +741,92 @@ const CreateQuestionPage = () => {
             </label>
           </div>
 
-          {/* Uploaded Files List */}
+          {/* Uploaded Files List with Preview */}
           {attachments.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-sm font-medium text-gray-700">
                 Uploaded Files ({attachments.length})
               </p>
-              <div className="space-y-2">
-                {attachments.map((attachment, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {attachments.map((attachment, index) => {
+                  const FILE_BASE_URL = import.meta.env.VITE_API_URL 
+                    ? import.meta.env.VITE_API_URL.replace('/api', '') 
+                    : 'http://localhost:5000';
+                  const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                  
+                  // Check if this attachment is used in question text
+                  const placeholderRegex = new RegExp(`\\{\\{attachment:${index}\\}\\}`, 'g');
+                  const isUsedInQuestion = placeholderRegex.test(formData.questionText);
+                  
+                  return (
+                    <div
+                      key={index}
+                      className={`border rounded-lg overflow-hidden bg-white ${
+                        isUsedInQuestion ? 'border-green-400 ring-2 ring-green-200' : 'border-gray-200'
+                      }`}
+                    >
+                      {/* Index Badge */}
+                      <div className="absolute top-2 left-2 z-10">
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shadow-lg ${
+                          isUsedInQuestion 
+                            ? 'bg-green-500 text-white' 
+                            : 'bg-gray-700 text-white'
+                        }`}>
+                          {index}
+                        </span>
+                      </div>
+                      
+                      {/* Preview Section */}
                       {attachment.fileType.startsWith('image/') ? (
-                        <ImageIcon className="w-5 h-5 text-blue-500 shrink-0" />
+                        <div className="relative group">
+                          <img
+                            src={fileUrl}
+                            alt={attachment.fileName}
+                            className="w-full h-48 object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all" />
+                        </div>
                       ) : (
-                        <FileText className="w-5 h-5 text-gray-500 shrink-0" />
+                        <div className="flex items-center justify-center h-48 bg-gray-50">
+                          <FileText className="w-16 h-16 text-gray-400" />
+                        </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {attachment.fileName}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatFileSize(attachment.fileSize)}
-                        </p>
+                      
+                      {/* File Info Section */}
+                      <div className={`p-3 border-t ${
+                        isUsedInQuestion ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                      }`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {attachment.fileName}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {formatFileSize(attachment.fileSize)}
+                            </p>
+                            {isUsedInQuestion && (
+                              <p className="text-xs text-green-700 font-medium mt-1">
+                                ✓ Used in question
+                              </p>
+                            )}
+                            <p className="text-xs text-gray-600 font-mono mt-1 bg-white px-1.5 py-0.5 rounded border inline-block">
+                              {'{{attachment:' + index + '}}'}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveAttachment(index)}
+                            className="shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveAttachment(index)}
-                      className="shrink-0 ml-2"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

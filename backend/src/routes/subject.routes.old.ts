@@ -39,7 +39,7 @@ router.post('/', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
       return res.status(400).json({ message: 'Subject with this name already exists' });
     }
 
-    // Create subject with chapters (each chapter has name and topics array)
+    // Create subject
     const subject = new Subject({
       name: name.trim(),
       chapters: chapters || [],
@@ -104,9 +104,9 @@ router.delete('/:id', authenticate, authorize(UserRole.ADMIN), async (req, res) 
 // Add chapter to subject (Admin only)
 router.post('/:id/chapters', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
   try {
-    const { name, topics } = req.body;
+    const { chapter } = req.body;
 
-    if (!name || !name.trim()) {
+    if (!chapter || !chapter.trim()) {
       return res.status(400).json({ message: 'Chapter name is required' });
     }
 
@@ -116,12 +116,11 @@ router.post('/:id/chapters', authenticate, authorize(UserRole.ADMIN), async (req
     }
 
     // Check if chapter already exists
-    const chapterExists = subject.chapters.some(ch => ch.name === name.trim());
-    if (chapterExists) {
+    if (subject.chapters.includes(chapter.trim())) {
       return res.status(400).json({ message: 'Chapter already exists in this subject' });
     }
 
-    subject.chapters.push({ name: name.trim(), topics: topics || [] });
+    subject.chapters.push(chapter.trim());
     await subject.save();
 
     res.json({ message: 'Chapter added successfully', subject });
@@ -133,10 +132,10 @@ router.post('/:id/chapters', authenticate, authorize(UserRole.ADMIN), async (req
 // Update chapter in subject (Admin only)
 router.put('/:id/chapters/:chapterIndex', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
   try {
-    const { name, topics } = req.body;
+    const { chapter } = req.body;
     const chapterIndex = parseInt(req.params.chapterIndex);
 
-    if (!name || !name.trim()) {
+    if (!chapter || !chapter.trim()) {
       return res.status(400).json({ message: 'Chapter name is required' });
     }
 
@@ -151,16 +150,13 @@ router.put('/:id/chapters/:chapterIndex', authenticate, authorize(UserRole.ADMIN
 
     // Check if new chapter name already exists (excluding current index)
     const existingIndex = subject.chapters.findIndex((ch, idx) => 
-      ch.name === name.trim() && idx !== chapterIndex
+      ch === chapter.trim() && idx !== chapterIndex
     );
     if (existingIndex !== -1) {
       return res.status(400).json({ message: 'Chapter with this name already exists' });
     }
 
-    subject.chapters[chapterIndex].name = name.trim();
-    if (topics !== undefined) {
-      subject.chapters[chapterIndex].topics = topics;
-    }
+    subject.chapters[chapterIndex] = chapter.trim();
     await subject.save();
 
     res.json({ message: 'Chapter updated successfully', subject });
@@ -187,114 +183,6 @@ router.delete('/:id/chapters/:chapterIndex', authenticate, authorize(UserRole.AD
     await subject.save();
 
     res.json({ message: 'Chapter deleted successfully', subject });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || 'Server error' });
-  }
-});
-
-// Add topic to chapter (Admin only)
-router.post('/:id/chapters/:chapterIndex/topics', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
-  try {
-    const { topic } = req.body;
-    const chapterIndex = parseInt(req.params.chapterIndex);
-
-    if (!topic || !topic.trim()) {
-      return res.status(400).json({ message: 'Topic name is required' });
-    }
-
-    const subject = await Subject.findById(req.params.id);
-    if (!subject) {
-      return res.status(404).json({ message: 'Subject not found' });
-    }
-
-    if (chapterIndex < 0 || chapterIndex >= subject.chapters.length) {
-      return res.status(400).json({ message: 'Invalid chapter index' });
-    }
-
-    const chapter = subject.chapters[chapterIndex];
-    
-    // Check if topic already exists in this chapter
-    if (chapter.topics.includes(topic.trim())) {
-      return res.status(400).json({ message: 'Topic already exists in this chapter' });
-    }
-
-    chapter.topics.push(topic.trim());
-    await subject.save();
-
-    res.json({ message: 'Topic added successfully', subject });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || 'Server error' });
-  }
-});
-
-// Update topic in chapter (Admin only)
-router.put('/:id/chapters/:chapterIndex/topics/:topicIndex', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
-  try {
-    const { topic } = req.body;
-    const chapterIndex = parseInt(req.params.chapterIndex);
-    const topicIndex = parseInt(req.params.topicIndex);
-
-    if (!topic || !topic.trim()) {
-      return res.status(400).json({ message: 'Topic name is required' });
-    }
-
-    const subject = await Subject.findById(req.params.id);
-    if (!subject) {
-      return res.status(404).json({ message: 'Subject not found' });
-    }
-
-    if (chapterIndex < 0 || chapterIndex >= subject.chapters.length) {
-      return res.status(400).json({ message: 'Invalid chapter index' });
-    }
-
-    const chapter = subject.chapters[chapterIndex];
-
-    if (topicIndex < 0 || topicIndex >= chapter.topics.length) {
-      return res.status(400).json({ message: 'Invalid topic index' });
-    }
-
-    // Check if new topic name already exists (excluding current index)
-    const existingIndex = chapter.topics.findIndex((t, idx) => 
-      t === topic.trim() && idx !== topicIndex
-    );
-    if (existingIndex !== -1) {
-      return res.status(400).json({ message: 'Topic with this name already exists in this chapter' });
-    }
-
-    chapter.topics[topicIndex] = topic.trim();
-    await subject.save();
-
-    res.json({ message: 'Topic updated successfully', subject });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message || 'Server error' });
-  }
-});
-
-// Delete topic from chapter (Admin only)
-router.delete('/:id/chapters/:chapterIndex/topics/:topicIndex', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
-  try {
-    const chapterIndex = parseInt(req.params.chapterIndex);
-    const topicIndex = parseInt(req.params.topicIndex);
-
-    const subject = await Subject.findById(req.params.id);
-    if (!subject) {
-      return res.status(404).json({ message: 'Subject not found' });
-    }
-
-    if (chapterIndex < 0 || chapterIndex >= subject.chapters.length) {
-      return res.status(400).json({ message: 'Invalid chapter index' });
-    }
-
-    const chapter = subject.chapters[chapterIndex];
-
-    if (topicIndex < 0 || topicIndex >= chapter.topics.length) {
-      return res.status(400).json({ message: 'Invalid topic index' });
-    }
-
-    chapter.topics.splice(topicIndex, 1);
-    await subject.save();
-
-    res.json({ message: 'Topic deleted successfully', subject });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Server error' });
   }

@@ -5,11 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Plus, Search, Download, Trash2, BookOpen } from 'lucide-react';
 
+interface Chapter {
+  name: string;
+  topics: string[];
+}
+
+interface Subject {
+  _id: string;
+  name: string;
+  chapters: Chapter[];
+}
+
 const SubjectQuestionsPage = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
   const [questions, setQuestions] = useState([]);
-  const [subject, setSubject] = useState<any>(null);
+  const [subject, setSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState({ chapter: '', topic: '', difficulty: '' });
@@ -27,7 +38,7 @@ const SubjectQuestionsPage = () => {
         const subjectResponse = await api.get(`/subjects/${subjectId}`);
         setSubject(subjectResponse.data);
       } else {
-        setSubject({ name: 'Uncategorized', _id: 'uncategorized' });
+        setSubject({ name: 'Uncategorized', _id: 'uncategorized', chapters: [] });
       }
 
       // Fetch questions for this subject
@@ -172,8 +183,10 @@ const SubjectQuestionsPage = () => {
             className="px-3 py-2 border rounded-md"
           >
             <option value="">All Chapters</option>
-            {subject?.chapters?.map((chapter: string, idx: number) => (
-              <option key={idx} value={chapter}>{chapter}</option>
+            {subject?.chapters?.map((chapter: Chapter, idx: number) => (
+              <option key={idx} value={chapter.name}>
+                {chapter.name}
+              </option>
             ))}
           </select>
           <Button onClick={handleSearch}>

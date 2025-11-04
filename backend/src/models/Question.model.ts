@@ -6,12 +6,26 @@ export enum DifficultyLevel {
   HARD = 'hard'
 }
 
+export enum QuestionType {
+  MULTIPLE_CHOICE = 'multiple-choice',
+  TRUE_FALSE = 'true-false',
+  SHORT_ANSWER = 'short-answer',
+  LONG_ANSWER = 'long-answer'
+}
+
+export enum AttachmentPosition {
+  BEFORE = 'before',
+  AFTER = 'after',
+  CUSTOM = 'custom'
+}
+
 export interface IQuestion extends Document {
   questionNumber: string;
   chapter: string;
   topic?: string;
   marks: number;
   difficultyLevel: DifficultyLevel;
+  questionType: QuestionType;
   questionText: string;
   questionImage?: string;
   attachments?: Array<{
@@ -20,6 +34,7 @@ export interface IQuestion extends Document {
     fileType: string;
     fileSize: number;
   }>;
+  attachmentPosition?: AttachmentPosition;
   options?: string[];
   correctAnswer?: string;
   subject: mongoose.Types.ObjectId;
@@ -40,7 +55,7 @@ const questionSchema = new Schema<IQuestion>(
     },
     topic: {
       type: String,
-      required: false
+      required: true
     },
     marks: {
       type: Number,
@@ -51,6 +66,12 @@ const questionSchema = new Schema<IQuestion>(
       type: String,
       enum: Object.values(DifficultyLevel),
       required: true
+    },
+    questionType: {
+      type: String,
+      enum: Object.values(QuestionType),
+      required: true,
+      default: QuestionType.SHORT_ANSWER
     },
     questionText: {
       type: String,
@@ -77,11 +98,17 @@ const questionSchema = new Schema<IQuestion>(
         required: true
       }
     }],
+    attachmentPosition: {
+      type: String,
+      enum: Object.values(AttachmentPosition),
+      default: AttachmentPosition.AFTER
+    },
     options: [{
       type: String
     }],
     correctAnswer: {
-      type: String
+      type: String,
+      required: true
     },
     subject: {
       type: Schema.Types.ObjectId,

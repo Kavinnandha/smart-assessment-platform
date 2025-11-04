@@ -33,10 +33,15 @@ interface Group {
   students: Student[];
 }
 
+interface Chapter {
+  name: string;
+  topics: string[];
+}
+
 interface Subject {
   _id: string;
   name: string;
-  chapters: string[];
+  chapters: Chapter[];
 }
 
 interface SelectedQuestion {
@@ -706,23 +711,23 @@ const CreateTestPage = () => {
                                 >
                                   <input
                                     type="checkbox"
-                                    checked={autoGenSettings.chapters.includes(chapter)}
+                                    checked={autoGenSettings.chapters.includes(chapter.name)}
                                     onChange={(e) => {
                                       if (e.target.checked) {
                                         setAutoGenSettings({
                                           ...autoGenSettings,
-                                          chapters: [...autoGenSettings.chapters, chapter]
+                                          chapters: [...autoGenSettings.chapters, chapter.name]
                                         });
                                       } else {
                                         setAutoGenSettings({
                                           ...autoGenSettings,
-                                          chapters: autoGenSettings.chapters.filter(c => c !== chapter)
+                                          chapters: autoGenSettings.chapters.filter(c => c !== chapter.name)
                                         });
                                       }
                                     }}
                                     className="h-4 w-4 rounded border-gray-300"
                                   />
-                                  <span className="text-sm">{chapter}</span>
+                                  <span className="text-sm">{chapter.name}</span>
                                 </label>
                               ))}
                             </div>
@@ -835,8 +840,8 @@ const CreateTestPage = () => {
                         {subjects
                           .find(s => s._id === formData.subject)
                           ?.chapters.map((chapter, index) => (
-                            <option key={index} value={chapter}>
-                              {chapter}
+                            <option key={index} value={chapter.name}>
+                              {chapter.name}
                             </option>
                           ))}
                       </select>

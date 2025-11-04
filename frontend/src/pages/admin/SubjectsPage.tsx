@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BookOpen, Plus, Edit, Trash2, FolderOpen, X, Check } from 'lucide-react';
+import { BookOpen, Plus, Edit, Trash2, FolderOpen, X, Check, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,17 +12,113 @@ import {
 } from '@/components/ui/dialog';
 import api from '@/lib/api';
 
+interface Chapter {
+  name: string;
+  topics: string[];
+}
+
 interface Subject {
   _id: string;
   name: string;
-  chapters: string[];
+  chapters: Chapter[];
   createdAt: string;
   updatedAt: string;
 }
 
 interface SubjectFormData {
   name: string;
-  chapters: string[];
+  chapters: Chapter[];
+}
+
+// Separate component for chapter form item to avoid hook issues
+function ChapterFormItem({ 
+  chapter, 
+  chapterIndex, 
+  onRemoveChapter, 
+  onAddTopic, 
+  onRemoveTopic 
+}: {
+  chapter: Chapter;
+  chapterIndex: number;
+  onRemoveChapter: (index: number) => void;
+  onAddTopic: (chapterIndex: number, topicName: string) => void;
+  onRemoveTopic: (chapterIndex: number, topicIndex: number) => void;
+}) {
+  const [newTopicInput, setNewTopicInput] = useState('');
+
+  return (
+    <div className="border rounded-md p-3 bg-gray-50">
+      {/* Chapter header */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="flex-1 font-medium text-sm">{chapter.name}</span>
+        <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
+          {chapter.topics.length} topics
+        </span>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => onRemoveChapter(chapterIndex)}
+          className="text-red-600 h-7 px-2"
+        >
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* Topics list */}
+      {chapter.topics.length > 0 && (
+        <div className="space-y-1 mb-2">
+          {chapter.topics.map((topic, topicIndex) => (
+            <div key={topicIndex} className="flex items-center gap-2 bg-white p-1.5 rounded text-sm">
+              <span className="flex-1">{topic}</span>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => onRemoveTopic(chapterIndex, topicIndex)}
+                className="h-6 w-6 p-0 text-red-600"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add topic to chapter */}
+      <div className="flex gap-2">
+        <Input
+          value={newTopicInput}
+          onChange={(e) => setNewTopicInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (newTopicInput.trim()) {
+                onAddTopic(chapterIndex, newTopicInput);
+                setNewTopicInput('');
+              }
+            }
+          }}
+          placeholder="Add topic..."
+          className="h-7 text-sm"
+        />
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            if (newTopicInput.trim()) {
+              onAddTopic(chapterIndex, newTopicInput);
+              setNewTopicInput('');
+            }
+          }}
+          disabled={!newTopicInput.trim()}
+          className="h-7 px-2"
+        >
+          <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function SubjectsPage() {
@@ -34,13 +130,23 @@ export default function SubjectsPage() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [deletingSubject, setDeletingSubject] = useState<Subject | null>(null);
   const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
+  const [expandedChapter, setExpandedChapter] = useState<{subjectId: string, chapterIndex: number} | null>(null);
+  
   const [formData, setFormData] = useState<SubjectFormData>({
     name: '',
     chapters: [],
   });
-  const [newChapter, setNewChapter] = useState('');
+  
+  // Chapter management
+  const [newChapterName, setNewChapterName] = useState('');
   const [editingChapterIndex, setEditingChapterIndex] = useState<number | null>(null);
   const [editingChapterValue, setEditingChapterValue] = useState('');
+  
+  // Topic management
+  const [newTopic, setNewTopic] = useState('');
+  const [editingTopic, setEditingTopic] = useState<{chapterIndex: number, topicIndex: number} | null>(null);
+  const [editingTopicValue, setEditingTopicValue] = useState('');
+  
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -65,7 +171,7 @@ export default function SubjectsPage() {
       setEditingSubject(subject);
       setFormData({
         name: subject.name,
-        chapters: [...subject.chapters],
+        chapters: JSON.parse(JSON.stringify(subject.chapters)), // Deep copy
       });
     } else {
       setEditingSubject(null);
@@ -74,7 +180,7 @@ export default function SubjectsPage() {
         chapters: [],
       });
     }
-    setNewChapter('');
+    setNewChapterName('');
     setError('');
     setIsSubjectDialogOpen(true);
   };
@@ -82,23 +188,24 @@ export default function SubjectsPage() {
   const handleCloseSubjectDialog = () => {
     setIsSubjectDialogOpen(false);
     setEditingSubject(null);
-    setNewChapter('');
+    setNewChapterName('');
     setError('');
   };
 
+  // Chapter management in form
   const handleAddChapterToForm = () => {
-    if (!newChapter.trim()) return;
+    if (!newChapterName.trim()) return;
     
-    if (formData.chapters.includes(newChapter.trim())) {
+    if (formData.chapters.some(ch => ch.name === newChapterName.trim())) {
       setError('Chapter already exists');
       return;
     }
 
     setFormData({
       ...formData,
-      chapters: [...formData.chapters, newChapter.trim()],
+      chapters: [...formData.chapters, { name: newChapterName.trim(), topics: [] }],
     });
-    setNewChapter('');
+    setNewChapterName('');
     setError('');
   };
 
@@ -107,6 +214,27 @@ export default function SubjectsPage() {
       ...formData,
       chapters: formData.chapters.filter((_, i) => i !== index),
     });
+  };
+
+  // Topic management in form
+  const handleAddTopicToChapterInForm = (chapterIndex: number, topicName: string) => {
+    if (!topicName.trim()) return;
+
+    const updatedChapters = [...formData.chapters];
+    if (updatedChapters[chapterIndex].topics.includes(topicName.trim())) {
+      setError('Topic already exists in this chapter');
+      return;
+    }
+
+    updatedChapters[chapterIndex].topics.push(topicName.trim());
+    setFormData({ ...formData, chapters: updatedChapters });
+    setError('');
+  };
+
+  const handleRemoveTopicFromChapterInForm = (chapterIndex: number, topicIndex: number) => {
+    const updatedChapters = [...formData.chapters];
+    updatedChapters[chapterIndex].topics.splice(topicIndex, 1);
+    setFormData({ ...formData, chapters: updatedChapters });
   };
 
   const handleSubmitSubject = async (e: React.FormEvent) => {
@@ -155,12 +283,13 @@ export default function SubjectsPage() {
     }
   };
 
+  // Inline chapter operations
   const handleAddChapter = async (subjectId: string) => {
-    if (!newChapter.trim()) return;
+    if (!newChapterName.trim()) return;
 
     try {
-      await api.post(`/subjects/${subjectId}/chapters`, { chapter: newChapter.trim() });
-      setNewChapter('');
+      await api.post(`/subjects/${subjectId}/chapters`, { name: newChapterName.trim(), topics: [] });
+      setNewChapterName('');
       await fetchSubjects();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to add chapter');
@@ -172,12 +301,13 @@ export default function SubjectsPage() {
     setEditingChapterValue(currentValue);
   };
 
-  const handleSaveChapter = async (subjectId: string) => {
+  const handleSaveChapter = async (subjectId: string, chapterIndex: number, topics: string[]) => {
     if (editingChapterIndex === null || !editingChapterValue.trim()) return;
 
     try {
-      await api.put(`/subjects/${subjectId}/chapters/${editingChapterIndex}`, {
-        chapter: editingChapterValue.trim(),
+      await api.put(`/subjects/${subjectId}/chapters/${chapterIndex}`, {
+        name: editingChapterValue.trim(),
+        topics: topics
       });
       setEditingChapterIndex(null);
       setEditingChapterValue('');
@@ -188,6 +318,8 @@ export default function SubjectsPage() {
   };
 
   const handleDeleteChapter = async (subjectId: string, chapterIndex: number) => {
+    if (!window.confirm('Are you sure you want to delete this chapter and all its topics?')) return;
+
     try {
       await api.delete(`/subjects/${subjectId}/chapters/${chapterIndex}`);
       await fetchSubjects();
@@ -196,14 +328,73 @@ export default function SubjectsPage() {
     }
   };
 
+  // Inline topic operations
+  const handleAddTopic = async (subjectId: string, chapterIndex: number) => {
+    if (!newTopic.trim()) return;
+
+    try {
+      await api.post(`/subjects/${subjectId}/chapters/${chapterIndex}/topics`, { topic: newTopic.trim() });
+      setNewTopic('');
+      await fetchSubjects();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add topic');
+    }
+  };
+
+  const handleStartEditTopic = (chapterIndex: number, topicIndex: number, currentValue: string) => {
+    setEditingTopic({ chapterIndex, topicIndex });
+    setEditingTopicValue(currentValue);
+  };
+
+  const handleSaveTopic = async (subjectId: string, chapterIndex: number, topicIndex: number) => {
+    if (!editingTopic || !editingTopicValue.trim()) return;
+
+    try {
+      await api.put(`/subjects/${subjectId}/chapters/${chapterIndex}/topics/${topicIndex}`, {
+        topic: editingTopicValue.trim()
+      });
+      setEditingTopic(null);
+      setEditingTopicValue('');
+      await fetchSubjects();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to update topic');
+    }
+  };
+
+  const handleDeleteTopic = async (subjectId: string, chapterIndex: number, topicIndex: number) => {
+    try {
+      await api.delete(`/subjects/${subjectId}/chapters/${chapterIndex}/topics/${topicIndex}`);
+      await fetchSubjects();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to delete topic');
+    }
+  };
+
   const toggleExpandSubject = (subjectId: string) => {
     setExpandedSubject(expandedSubject === subjectId ? null : subjectId);
     setEditingChapterIndex(null);
-    setNewChapter('');
+    setNewChapterName('');
+    setExpandedChapter(null);
+  };
+
+  const toggleExpandChapter = (subjectId: string, chapterIndex: number) => {
+    const key = { subjectId, chapterIndex };
+    if (expandedChapter?.subjectId === subjectId && expandedChapter?.chapterIndex === chapterIndex) {
+      setExpandedChapter(null);
+    } else {
+      setExpandedChapter(key);
+    }
+    setNewTopic('');
+    setEditingTopic(null);
   };
 
   const filteredSubjects = subjects.filter(subject =>
     subject.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalChapters = subjects.reduce((acc, subject) => acc + subject.chapters.length, 0);
+  const totalTopics = subjects.reduce((acc, subject) => 
+    acc + subject.chapters.reduce((sum, chapter) => sum + chapter.topics.length, 0), 0
   );
 
   if (loading) {
@@ -221,8 +412,8 @@ export default function SubjectsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Subjects & Chapters</h1>
-          <p className="text-gray-600 mt-1">Manage subjects and their chapters</p>
+          <h1 className="text-3xl font-bold">Subjects, Chapters & Topics</h1>
+          <p className="text-gray-600 mt-1">Manage subjects, chapters, and their topics</p>
         </div>
         <Button onClick={() => handleOpenSubjectDialog()} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -241,7 +432,7 @@ export default function SubjectsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -260,30 +451,37 @@ export default function SubjectsPage() {
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Chapters</p>
-              <p className="text-2xl font-bold">
-                {subjects.reduce((acc, subject) => acc + subject.chapters.length, 0)}
-              </p>
+              <p className="text-2xl font-bold">{totalChapters}</p>
             </div>
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-purple-600" />
+              <List className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Avg Chapters/Subject</p>
+              <p className="text-sm text-gray-600">Total Topics</p>
+              <p className="text-2xl font-bold">{totalTopics}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <BookOpen className="h-6 w-6 text-orange-600" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Avg Topics/Chapter</p>
               <p className="text-2xl font-bold">
-                {subjects.length > 0
-                  ? (subjects.reduce((acc, subject) => acc + subject.chapters.length, 0) / subjects.length).toFixed(1)
-                  : 0}
+                {totalChapters > 0 ? (totalTopics / totalChapters).toFixed(1) : 0}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Subjects Grid - Card View */}
+      {/* Subjects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredSubjects.length === 0 ? (
           <div className="col-span-full bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500">
@@ -321,9 +519,13 @@ export default function SubjectsPage() {
                 </div>
                 
                 <h3 className="font-bold text-xl mb-2">{subject.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  {subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}
-                </p>
+                <div className="flex gap-3 text-sm text-gray-600 mb-4">
+                  <span>{subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}</span>
+                  <span>•</span>
+                  <span>
+                    {subject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0)} topic{subject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0) !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 
                 <Button
                   variant="outline"
@@ -345,60 +547,172 @@ export default function SubjectsPage() {
                   </h4>
                   
                   {/* Existing Chapters */}
-                  <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 mb-3 max-h-96 overflow-y-auto">
                     {subject.chapters.length === 0 ? (
                       <p className="text-sm text-gray-500 italic">No chapters yet</p>
                     ) : (
-                      subject.chapters.map((chapter, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-white p-2.5 rounded-md border">
-                          {editingChapterIndex === index ? (
-                            <>
-                              <Input
-                                value={editingChapterValue}
-                                onChange={(e) => setEditingChapterValue(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleSaveChapter(subject._id);
-                                  if (e.key === 'Escape') setEditingChapterIndex(null);
-                                }}
-                                className="flex-1 h-8"
-                                autoFocus
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => handleSaveChapter(subject._id)}
-                                className="h-8 px-2"
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingChapterIndex(null)}
-                                className="h-8 px-2"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <span className="flex-1 text-sm font-medium">{chapter}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleStartEditChapter(index, chapter)}
-                                className="h-7 w-7 p-0"
-                              >
-                                <Edit className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDeleteChapter(subject._id, index)}
-                                className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
+                      subject.chapters.map((chapter, chapterIndex) => (
+                        <div key={chapterIndex} className="border rounded-md bg-white">
+                          <div className="flex items-center gap-2 p-2.5">
+                            {editingChapterIndex === chapterIndex ? (
+                              <>
+                                <Input
+                                  value={editingChapterValue}
+                                  onChange={(e) => setEditingChapterValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveChapter(subject._id, chapterIndex, chapter.topics);
+                                    if (e.key === 'Escape') setEditingChapterIndex(null);
+                                  }}
+                                  className="flex-1 h-8"
+                                  autoFocus
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSaveChapter(subject._id, chapterIndex, chapter.topics)}
+                                  className="h-8 px-2"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditingChapterIndex(null)}
+                                  className="h-8 px-2"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">{chapter.name}</span>
+                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                      {chapter.topics.length} topic{chapter.topics.length !== 1 ? 's' : ''}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => toggleExpandChapter(subject._id, chapterIndex)}
+                                  className="h-7 w-7 p-0"
+                                  title="View topics"
+                                >
+                                  <List className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleStartEditChapter(chapterIndex, chapter.name)}
+                                  className="h-7 w-7 p-0"
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleDeleteChapter(subject._id, chapterIndex)}
+                                  className="h-7 w-7 p-0 text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Topics List (Nested Expandable) */}
+                          {expandedChapter?.subjectId === subject._id && 
+                           expandedChapter?.chapterIndex === chapterIndex && (
+                            <div className="border-t bg-gray-50 p-3">
+                              <h5 className="font-medium mb-2 text-xs text-gray-700 flex items-center gap-1">
+                                <List className="h-3 w-3" />
+                                Topics
+                              </h5>
+                              
+                              <div className="space-y-1.5 mb-2 max-h-40 overflow-y-auto">
+                                {chapter.topics.length === 0 ? (
+                                  <p className="text-xs text-gray-500 italic">No topics yet</p>
+                                ) : (
+                                  chapter.topics.map((topic, topicIndex) => (
+                                    <div key={topicIndex} className="flex items-center gap-1.5 bg-white p-1.5 rounded text-xs border">
+                                      {editingTopic?.chapterIndex === chapterIndex && 
+                                       editingTopic?.topicIndex === topicIndex ? (
+                                        <>
+                                          <Input
+                                            value={editingTopicValue}
+                                            onChange={(e) => setEditingTopicValue(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') handleSaveTopic(subject._id, chapterIndex, topicIndex);
+                                              if (e.key === 'Escape') setEditingTopic(null);
+                                            }}
+                                            className="flex-1 h-6 text-xs"
+                                            autoFocus
+                                          />
+                                          <Button
+                                            size="sm"
+                                            onClick={() => handleSaveTopic(subject._id, chapterIndex, topicIndex)}
+                                            className="h-6 px-1.5"
+                                          >
+                                            <Check className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => setEditingTopic(null)}
+                                            className="h-6 px-1.5"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span className="flex-1">{topic}</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleStartEditTopic(chapterIndex, topicIndex, topic)}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleDeleteTopic(subject._id, chapterIndex, topicIndex)}
+                                            className="h-6 w-6 p-0 text-red-600 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+
+                              {/* Add Topic Input */}
+                              <div className="flex gap-1.5">
+                                <Input
+                                  placeholder="Add topic..."
+                                  value={newTopic}
+                                  onChange={(e) => setNewTopic(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleAddTopic(subject._id, chapterIndex);
+                                  }}
+                                  className="flex-1 h-7 text-xs"
+                                />
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAddTopic(subject._id, chapterIndex)}
+                                  disabled={!newTopic.trim()}
+                                  className="gap-1 h-7 text-xs"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  Add
+                                </Button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))
@@ -409,8 +723,8 @@ export default function SubjectsPage() {
                   <div className="flex gap-2">
                     <Input
                       placeholder="Add new chapter..."
-                      value={newChapter}
-                      onChange={(e) => setNewChapter(e.target.value)}
+                      value={newChapterName}
+                      onChange={(e) => setNewChapterName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') handleAddChapter(subject._id);
                       }}
@@ -418,7 +732,7 @@ export default function SubjectsPage() {
                     />
                     <Button
                       onClick={() => handleAddChapter(subject._id)}
-                      disabled={!newChapter.trim()}
+                      disabled={!newChapterName.trim()}
                       size="sm"
                       className="gap-1.5 h-9"
                     >
@@ -435,11 +749,11 @@ export default function SubjectsPage() {
 
       {/* Create/Edit Subject Dialog */}
       <Dialog open={isSubjectDialogOpen} onOpenChange={setIsSubjectDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSubject ? 'Edit Subject' : 'Add New Subject'}</DialogTitle>
             <DialogDescription>
-              {editingSubject ? 'Update subject information.' : 'Create a new subject with chapters.'}
+              {editingSubject ? 'Update subject information with chapters and topics.' : 'Create a new subject with chapters and topics.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmitSubject} className="space-y-4">
@@ -459,43 +773,42 @@ export default function SubjectsPage() {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-1">Chapters</label>
-              <div className="space-y-2 mb-2">
-                {formData.chapters.map((chapter, index) => (
-                  <div key={index} className="flex items-center gap-2 bg-gray-50 p-2 rounded">
-                    <span className="flex-1 text-sm">{chapter}</span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleRemoveChapterFromForm(index)}
-                      className="text-red-600"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
+              <label className="block text-sm font-medium mb-2">Chapters & Topics</label>
+              
+              {/* Existing chapters in form */}
+              <div className="space-y-3 mb-3 max-h-96 overflow-y-auto">
+                {formData.chapters.map((chapter, chapterIndex) => (
+                  <ChapterFormItem
+                    key={chapterIndex}
+                    chapter={chapter}
+                    chapterIndex={chapterIndex}
+                    onRemoveChapter={handleRemoveChapterFromForm}
+                    onAddTopic={handleAddTopicToChapterInForm}
+                    onRemoveTopic={handleRemoveTopicFromChapterInForm}
+                  />
                 ))}
                 {formData.chapters.length === 0 && (
                   <p className="text-sm text-gray-500 italic">No chapters added yet</p>
                 )}
               </div>
               
+              {/* Add new chapter */}
               <div className="flex gap-2">
                 <Input
-                  value={newChapter}
-                  onChange={(e) => setNewChapter(e.target.value)}
+                  value={newChapterName}
+                  onChange={(e) => setNewChapterName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddChapterToForm();
                     }
                   }}
-                  placeholder="Add chapter..."
+                  placeholder="Add chapter name..."
                 />
                 <Button
                   type="button"
                   onClick={handleAddChapterToForm}
-                  disabled={!newChapter.trim()}
+                  disabled={!newChapterName.trim()}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -525,14 +838,15 @@ export default function SubjectsPage() {
           <DialogHeader>
             <DialogTitle>Delete Subject</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this subject? This action cannot be undone.
+              Are you sure you want to delete this subject? This will also delete all its chapters and topics. This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {deletingSubject && (
             <div className="bg-gray-50 p-4 rounded-md">
               <p className="font-medium">{deletingSubject.name}</p>
               <p className="text-sm text-gray-600">
-                {deletingSubject.chapters.length} chapter{deletingSubject.chapters.length !== 1 ? 's' : ''}
+                {deletingSubject.chapters.length} chapter{deletingSubject.chapters.length !== 1 ? 's' : ''} • {' '}
+                {deletingSubject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0)} topic{deletingSubject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0) !== 1 ? 's' : ''}
               </p>
             </div>
           )}
