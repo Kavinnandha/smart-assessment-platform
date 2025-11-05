@@ -6,7 +6,6 @@ interface User {
   email: string;
   name: string;
   role: 'admin' | 'teacher' | 'student';
-  subjects?: string[];
 }
 
 interface AuthContextType {
@@ -22,7 +21,6 @@ interface RegisterData {
   password: string;
   name: string;
   role: string;
-  subjects?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { UsersRound, Plus, Edit, Trash2, Users, GraduationCap } from 'lucide-react';
+import { UsersRound, Plus, Edit, Trash2, GraduationCap, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,10 +26,16 @@ interface Teacher {
   email: string;
 }
 
+interface Subject {
+  _id: string;
+  name: string;
+}
+
 interface Group {
   _id: string;
   name: string;
   description: string;
+  subject: Subject;
   students: Student[];
   teachers: Teacher[];
   createdAt: string;
@@ -39,6 +45,7 @@ interface Group {
 interface GroupFormData {
   name: string;
   description: string;
+  subject: string;
   students: string[];
   teachers: string[];
 }
@@ -50,6 +57,7 @@ export default function StudentGroupsPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
@@ -59,6 +67,7 @@ export default function StudentGroupsPage() {
   const [formData, setFormData] = useState<GroupFormData>({
     name: '',
     description: '',
+    subject: '',
     students: [],
     teachers: [],
   });
@@ -69,6 +78,7 @@ export default function StudentGroupsPage() {
     fetchGroups();
     fetchStudents();
     fetchTeachers();
+    fetchSubjects();
   }, []);
 
   const fetchGroups = async () => {
@@ -101,12 +111,22 @@ export default function StudentGroupsPage() {
     }
   };
 
+  const fetchSubjects = async () => {
+    try {
+      const response = await api.get('/subjects');
+      setSubjects(response.data || []);
+    } catch (err: any) {
+      console.error('Failed to fetch subjects:', err);
+    }
+  };
+
   const handleOpenGroupDialog = (group?: Group) => {
     if (group) {
       setEditingGroup(group);
       setFormData({
         name: group.name,
         description: group.description || '',
+        subject: group.subject._id,
         students: group.students.map(s => s._id),
         teachers: group.teachers?.map(t => t._id) || [],
       });
@@ -115,6 +135,7 @@ export default function StudentGroupsPage() {
       setFormData({
         name: '',
         description: '',
+        subject: '',
         students: [],
         teachers: [],
       });
@@ -235,47 +256,6 @@ export default function StudentGroupsPage() {
         />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <UsersRound className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Groups</p>
-              <p className="text-2xl font-bold">{groups.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Users className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Students</p>
-              <p className="text-2xl font-bold">{students.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Users className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Avg Students/Group</p>
-              <p className="text-2xl font-bold">
-                {groups.length > 0
-                  ? (groups.reduce((acc, g) => acc + g.students.length, 0) / groups.length).toFixed(1)
-                  : 0}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Groups Grid - Card View */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredGroups.length === 0 ? (
@@ -318,6 +298,13 @@ export default function StudentGroupsPage() {
                 {group.description && (
                   <p className="text-sm text-gray-600 mb-3 line-clamp-2">{group.description}</p>
                 )}
+                
+                <div className="mb-3">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                    <BookOpen className="h-3 w-3" />
+                    {group.subject.name}
+                  </span>
+                </div>
                 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -403,6 +390,25 @@ export default function StudentGroupsPage() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="e.g., First year students - Morning batch"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="subject">Subject *</Label>
+              <select
+                id="subject"
+                required
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <option value="">Select a subject</option>
+                {subjects.map((subject) => (
+                  <option key={subject._id} value={subject._id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Select the subject for this group</p>
             </div>
 
             <div>

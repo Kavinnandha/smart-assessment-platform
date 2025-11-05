@@ -16,7 +16,7 @@ router.get('/', authenticate, authorize(UserRole.ADMIN, UserRole.TEACHER), async
       filter.role = role;
     }
     
-    const users = await User.find(filter).select('-password').populate('subjects', 'name');
+    const users = await User.find(filter).select('-password');
     res.json({ users });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -26,7 +26,7 @@ router.get('/', authenticate, authorize(UserRole.ADMIN, UserRole.TEACHER), async
 // Create new user (Admin only)
 router.post('/', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
   try {
-    const { name, email, password, role, subjects } = req.body;
+    const { name, email, password, role } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -42,8 +42,7 @@ router.post('/', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role,
-      subjects
+      role
     });
 
     await user.save();
@@ -61,7 +60,7 @@ router.post('/', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
 // Get user by ID
 router.get('/:id', authenticate, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password').populate('subjects', 'name');
+    const user = await User.findById(req.params.id).select('-password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -85,7 +84,7 @@ router.put('/:id', authenticate, authorize(UserRole.ADMIN), async (req, res) => 
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).select('-password').populate('subjects', 'name');
+    ).select('-password');
     
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

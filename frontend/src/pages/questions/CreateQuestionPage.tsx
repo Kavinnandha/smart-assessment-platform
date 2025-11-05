@@ -749,10 +749,20 @@ const CreateQuestionPage = () => {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {attachments.map((attachment, index) => {
-                  const FILE_BASE_URL = import.meta.env.VITE_API_URL 
+                  // Construct the correct file URL
+                  // The attachment.fileUrl is like "/uploads/filename.jpg"
+                  // We need to prepend the backend base URL
+                  const backendBaseUrl = import.meta.env.VITE_API_URL 
                     ? import.meta.env.VITE_API_URL.replace('/api', '') 
                     : 'http://localhost:5000';
-                  const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                  
+                  const fileUrl = `${backendBaseUrl}${attachment.fileUrl}`;
+                  
+                  // Debug: Log the constructed URL
+                  console.log('Attachment fileUrl from backend:', attachment.fileUrl);
+                  console.log('Backend base URL:', backendBaseUrl);
+                  console.log('Final constructed URL:', fileUrl);
+                  console.log('Attachment type:', attachment.fileType);
                   
                   // Check if this attachment is used in question text
                   const placeholderRegex = new RegExp(`\\{\\{attachment:${index}\\}\\}`, 'g');
@@ -761,7 +771,7 @@ const CreateQuestionPage = () => {
                   return (
                     <div
                       key={index}
-                      className={`border rounded-lg overflow-hidden bg-white ${
+                      className={`border rounded-lg overflow-hidden bg-white relative ${
                         isUsedInQuestion ? 'border-green-400 ring-2 ring-green-200' : 'border-gray-200'
                       }`}
                     >
@@ -778,13 +788,30 @@ const CreateQuestionPage = () => {
                       
                       {/* Preview Section */}
                       {attachment.fileType.startsWith('image/') ? (
-                        <div className="relative group">
+                        <div className="relative h-48 bg-gray-100 flex items-center justify-center">
+                          {/* Debug URL Display - Remove after testing */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 text-white text-xs p-1 truncate z-20">
+                            {fileUrl}
+                          </div>
                           <img
                             src={fileUrl}
                             alt={attachment.fileName}
-                            className="w-full h-48 object-cover"
+                            className="max-w-full max-h-full object-contain"
+                            loading="lazy"
+                            onLoad={() => {
+                              console.log('✓ Image loaded successfully:', fileUrl);
+                            }}
+                            onError={(e) => {
+                              console.error('✗ Image failed to load:', fileUrl);
+                              console.error('Check if backend is running and serving files at /uploads');
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `<div class="flex flex-col items-center justify-center h-48 bg-red-50 text-red-600 px-4"><svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span class="text-xs text-center">Failed to load image</span><span class="text-xs mt-1 font-mono truncate w-full text-center" title="${fileUrl}">${attachment.fileName}</span></div>`;
+                              }
+                            }}
                           />
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all" />
                         </div>
                       ) : (
                         <div className="flex items-center justify-center h-48 bg-gray-50">

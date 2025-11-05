@@ -3,7 +3,15 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Search, Download, Trash2, BookOpen } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Download, Trash2, BookOpen, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Chapter {
   name: string;
@@ -106,6 +114,369 @@ const SubjectQuestionsPage = () => {
     }
   };
 
+  const handleExportPDF = async () => {
+    try {
+      // Get filtered questions
+      const filteredQuestions = questions.filter((q: any) => {
+        if (filter.difficulty && q.difficultyLevel !== filter.difficulty) return false;
+        if (filter.chapter && q.chapter !== filter.chapter) return false;
+        if (filter.topic && q.topic !== filter.topic) return false;
+        return true;
+      });
+
+      if (filteredQuestions.length === 0) {
+        alert('No questions to export');
+        return;
+      }
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text(subject?.name || 'Questions', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Filters info
+      const filterInfo = [];
+      if (filter.chapter) filterInfo.push(`Chapter: ${filter.chapter}`);
+      if (filter.topic) filterInfo.push(`Topic: ${filter.topic}`);
+      if (filter.difficulty) filterInfo.push(`Difficulty: ${filter.difficulty}`);
+      
+      if (filterInfo.length > 0) {
+        doc.text(`Filters: ${filterInfo.join(', ')}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 7;
+      }
+      
+      doc.text(`Total Questions: ${filteredQuestions.length}`, pageWidth / 2, yPosition, { align: 'center' });
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, pageWidth / 2, yPosition + 5, { align: 'center' });
+      
+      yPosition += 15;
+
+      // Group questions by chapter
+      const questionsByChapter = filteredQuestions.reduce((acc: any, question: any) => {
+        const chapterName = question.chapter || 'No Chapter';
+        if (!acc[chapterName]) {
+          acc[chapterName] = [];
+        }
+        acc[chapterName].push(question);
+        return acc;
+      }, {});
+
+      // Add questions
+      Object.entries(questionsByChapter).forEach(([chapter, chapterQuestions]: [string, any]) => {
+        // Check if we need a new page
+        if (yPosition > pageHeight - 40) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        // Chapter header
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setFillColor(240, 240, 240);
+        doc.rect(10, yPosition - 5, pageWidth - 20, 10, 'F');
+        doc.text(`Chapter: ${chapter}`, 15, yPosition + 2);
+        yPosition += 12;
+
+        // Questions table
+        const tableData = chapterQuestions.map((q: any, index: number) => [
+          q.questionNumber || `Q${index + 1}`,
+          q.topic || '-',
+          q.difficultyLevel || '-',
+          q.marks?.toString() || '-',
+          q.questionType || '-',
+        ]);
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [['Q No.', 'Topic', 'Difficulty', 'Marks', 'Type']],
+          body: tableData,
+          theme: 'striped',
+          headStyles: { fillColor: [66, 66, 66], fontSize: 9 },
+          bodyStyles: { fontSize: 8 },
+          columnStyles: {
+            0: { cellWidth: 20 },
+            1: { cellWidth: 50 },
+            2: { cellWidth: 25 },
+            3: { cellWidth: 20 },
+            4: { cellWidth: 35 },
+          },
+          margin: { left: 10, right: 10 },
+          didDrawPage: () => {
+            // Footer
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text(
+              `Page ${doc.getCurrentPageInfo().pageNumber}`,
+              pageWidth / 2,
+              pageHeight - 10,
+              { align: 'center' }
+            );
+          },
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 10;
+      });
+
+      // Save the PDF
+      const fileName = `questions-${subject?.name || 'export'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+    } catch (error) {
+      console.error('Failed to export PDF:', error);
+      alert('Failed to export questions as PDF');
+    }
+  };
+
+  const handleExportDetailedPDF = async () => {
+    try {
+      // Get filtered questions
+      const filteredQuestions = questions.filter((q: any) => {
+        if (filter.difficulty && q.difficultyLevel !== filter.difficulty) return false;
+        if (filter.chapter && q.chapter !== filter.chapter) return false;
+        if (filter.topic && q.topic !== filter.topic) return false;
+        return true;
+      });
+
+      if (filteredQuestions.length === 0) {
+        alert('No questions to export');
+        return;
+      }
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (2 * margin);
+      let yPosition = 20;
+
+      // Helper function to add page footer
+      const addFooter = () => {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(128, 128, 128);
+        doc.text(
+          `Page ${doc.getCurrentPageInfo().pageNumber} | ${subject?.name || 'Questions'}`,
+          pageWidth / 2,
+          pageHeight - 10,
+          { align: 'center' }
+        );
+        doc.setTextColor(0, 0, 0);
+      };
+
+      // Helper function to check space and add new page if needed
+      const checkSpace = (requiredSpace: number) => {
+        if (yPosition + requiredSpace > pageHeight - 25) {
+          addFooter();
+          doc.addPage();
+          yPosition = 20;
+          return true;
+        }
+        return false;
+      };
+
+      // Title page
+      doc.setFontSize(22);
+      doc.setFont('helvetica', 'bold');
+      doc.text(subject?.name || 'Questions Bank', pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      
+      // Filters info
+      const filterInfo = [];
+      if (filter.chapter) filterInfo.push(`Chapter: ${filter.chapter}`);
+      if (filter.topic) filterInfo.push(`Topic: ${filter.topic}`);
+      if (filter.difficulty) filterInfo.push(`Difficulty: ${filter.difficulty}`);
+      
+      if (filterInfo.length > 0) {
+        filterInfo.forEach(info => {
+          doc.text(info, pageWidth / 2, yPosition, { align: 'center' });
+          yPosition += 7;
+        });
+      }
+      
+      yPosition += 5;
+      doc.text(`Total Questions: ${filteredQuestions.length}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 7;
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
+      
+      yPosition += 20;
+
+      // Statistics box
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(250, 250, 250);
+      doc.roundedRect(margin, yPosition, contentWidth, 35, 3, 3, 'FD');
+      
+      yPosition += 10;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Statistics', margin + 5, yPosition);
+      
+      yPosition += 7;
+      doc.setFont('helvetica', 'normal');
+      const stats = [
+        `Easy: ${filteredQuestions.filter((q: any) => q.difficultyLevel === 'easy').length}`,
+        `Medium: ${filteredQuestions.filter((q: any) => q.difficultyLevel === 'medium').length}`,
+        `Hard: ${filteredQuestions.filter((q: any) => q.difficultyLevel === 'hard').length}`,
+        `Total Marks: ${filteredQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0)}`
+      ];
+      stats.forEach(stat => {
+        doc.text(`• ${stat}`, margin + 10, yPosition);
+        yPosition += 6;
+      });
+
+      // Start questions on new page
+      addFooter();
+      doc.addPage();
+      yPosition = 20;
+
+      // Group questions by chapter
+      const questionsByChapter = filteredQuestions.reduce((acc: any, question: any) => {
+        const chapterName = question.chapter || 'No Chapter';
+        if (!acc[chapterName]) {
+          acc[chapterName] = [];
+        }
+        acc[chapterName].push(question);
+        return acc;
+      }, {});
+
+      // Add detailed questions
+      Object.entries(questionsByChapter).forEach(([chapter, chapterQuestions]: [string, any]) => {
+        checkSpace(20);
+
+        // Chapter header
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setFillColor(240, 240, 240);
+        doc.roundedRect(margin, yPosition - 5, contentWidth, 12, 2, 2, 'F');
+        doc.text(`Chapter: ${chapter}`, margin + 5, yPosition + 3);
+        yPosition += 15;
+
+        chapterQuestions.forEach((q: any, index: number) => {
+          checkSpace(40);
+
+          // Question number and metadata
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${q.questionNumber || `Q${index + 1}`}.`, margin, yPosition);
+          
+          // Metadata badges
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          let badgeX = margin + 25;
+          
+          // Topic badge
+          if (q.topic) {
+            doc.setFillColor(230, 240, 255);
+            doc.roundedRect(badgeX, yPosition - 3, doc.getTextWidth(q.topic) + 4, 5, 1, 1, 'F');
+            doc.text(q.topic, badgeX + 2, yPosition);
+            badgeX += doc.getTextWidth(q.topic) + 8;
+          }
+          
+          // Difficulty badge
+          const diffColors: any = {
+            easy: [200, 255, 200],
+            medium: [255, 240, 200],
+            hard: [255, 200, 200]
+          };
+          const diffColor = diffColors[q.difficultyLevel] || [240, 240, 240];
+          doc.setFillColor(diffColor[0], diffColor[1], diffColor[2]);
+          const diffText = q.difficultyLevel?.toUpperCase() || 'N/A';
+          doc.roundedRect(badgeX, yPosition - 3, doc.getTextWidth(diffText) + 4, 5, 1, 1, 'F');
+          doc.text(diffText, badgeX + 2, yPosition);
+          badgeX += doc.getTextWidth(diffText) + 8;
+          
+          // Marks badge
+          doc.setFillColor(255, 230, 200);
+          const marksText = `${q.marks || 0} marks`;
+          doc.roundedRect(badgeX, yPosition - 3, doc.getTextWidth(marksText) + 4, 5, 1, 1, 'F');
+          doc.text(marksText, badgeX + 2, yPosition);
+          
+          yPosition += 8;
+
+          // Question text
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const questionLines = doc.splitTextToSize(q.questionText || 'No question text', contentWidth - 5);
+          questionLines.forEach((line: string) => {
+            checkSpace(7);
+            doc.text(line, margin + 5, yPosition);
+            yPosition += 5;
+          });
+
+          yPosition += 3;
+
+          // Options for MCQ
+          if (q.questionType === 'multiple-choice' && q.options && q.options.length > 0) {
+            doc.setFont('helvetica', 'normal');
+            q.options.forEach((option: string, optIndex: number) => {
+              checkSpace(6);
+              const isCorrect = option === q.correctAnswer;
+              if (isCorrect) {
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(0, 128, 0);
+              }
+              const optionText = `   ${String.fromCharCode(65 + optIndex)}. ${option}`;
+              doc.text(optionText, margin + 5, yPosition);
+              if (isCorrect) {
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(0, 0, 0);
+              }
+              yPosition += 5;
+            });
+            yPosition += 2;
+          }
+
+          // Answer section
+          if (q.correctAnswer && q.questionType !== 'multiple-choice') {
+            checkSpace(15);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 100, 0);
+            doc.text('Answer:', margin + 5, yPosition);
+            yPosition += 5;
+            
+            doc.setFont('helvetica', 'normal');
+            const answerLines = doc.splitTextToSize(q.correctAnswer, contentWidth - 10);
+            answerLines.forEach((line: string) => {
+              checkSpace(5);
+              doc.text(line, margin + 10, yPosition);
+              yPosition += 4;
+            });
+            doc.setTextColor(0, 0, 0);
+            yPosition += 3;
+          }
+
+          // Separator line
+          doc.setDrawColor(220, 220, 220);
+          doc.line(margin, yPosition, pageWidth - margin, yPosition);
+          yPosition += 8;
+        });
+
+        yPosition += 5;
+      });
+
+      addFooter();
+
+      // Save the PDF
+      const fileName = `questions-detailed-${subject?.name || 'export'}-${new Date().toISOString().split('T')[0]}.pdf`;
+      doc.save(fileName);
+      
+    } catch (error) {
+      console.error('Failed to export detailed PDF:', error);
+      alert('Failed to export questions as detailed PDF');
+    }
+  };
+
   // Group questions by chapter
   const questionsByChapter = questions.reduce((acc: any, question: any) => {
     const chapterName = question.chapter || 'No Chapter';
@@ -143,10 +514,29 @@ const SubjectQuestionsPage = () => {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleExport} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPDF} className="cursor-pointer">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF (Summary)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportDetailedPDF} className="cursor-pointer">
+                <FileText className="h-4 w-4 mr-2" />
+                Export as PDF (Detailed)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExport} className="cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Export as Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link to={`/questions/create/${subjectId}`}>
             <Button>
               <Plus className="h-4 w-4 mr-2" />

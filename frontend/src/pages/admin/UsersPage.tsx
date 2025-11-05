@@ -10,13 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MultiSelect } from '@/components/ui/multi-select';
 import api from '@/lib/api';
-
-interface Subject {
-  _id: string;
-  name: string;
-}
 
 interface Teacher {
   _id: string;
@@ -35,7 +29,6 @@ interface User {
   name: string;
   email: string;
   role: 'admin' | 'teacher' | 'student';
-  subjects?: Subject[];
   createdAt: string;
 }
 
@@ -44,12 +37,10 @@ interface UserFormData {
   email: string;
   password: string;
   role: 'admin' | 'teacher' | 'student';
-  subjects: string[];
 }
 
 const UsersPage = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,14 +54,12 @@ const UsersPage = () => {
     email: '',
     password: '',
     role: 'student',
-    subjects: [],
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchUsers();
-    fetchSubjects();
     fetchGroups();
   }, []);
 
@@ -83,15 +72,6 @@ const UsersPage = () => {
       setError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSubjects = async () => {
-    try {
-      const response = await api.get('/subjects');
-      setSubjects(response.data);
-    } catch (err: any) {
-      console.error('Failed to fetch subjects:', err);
     }
   };
 
@@ -112,7 +92,6 @@ const UsersPage = () => {
         email: user.email,
         password: '',
         role: user.role,
-        subjects: user.subjects?.map(s => s._id) || [],
       });
     } else {
       setEditingUser(null);
@@ -121,7 +100,6 @@ const UsersPage = () => {
         email: '',
         password: '',
         role: 'student',
-        subjects: [],
       });
     }
     setError('');
@@ -145,10 +123,6 @@ const UsersPage = () => {
         email: formData.email,
         role: formData.role,
       };
-
-      if (formData.subjects.length > 0) {
-        submitData.subjects = formData.subjects;
-      }
 
       if (editingUser) {
         // Update existing user
@@ -352,9 +326,6 @@ const UsersPage = () => {
                   Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subjects
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Assigned Groups
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -368,7 +339,7 @@ const UsersPage = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No users found
                   </td>
                 </tr>
@@ -386,13 +357,6 @@ const UsersPage = () => {
                         {getRoleIcon(user.role)}
                         {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600">
-                        {user.subjects && user.subjects.length > 0 
-                          ? user.subjects.map(s => s.name).join(', ') 
-                          : '-'}
-                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {user.role === 'teacher' ? (
@@ -515,18 +479,6 @@ const UsersPage = () => {
                 <option value="teacher">Teacher</option>
                 <option value="admin">Admin</option>
               </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Subjects
-              </label>
-              <MultiSelect
-                options={subjects.map(s => ({ label: s.name, value: s._id }))}
-                selected={formData.subjects}
-                onChange={(selected) => setFormData({ ...formData, subjects: selected })}
-                placeholder="Select subjects..."
-              />
-              <p className="text-xs text-gray-500 mt-1">Optional: Select one or more subjects</p>
             </div>
             <DialogFooter>
               <Button

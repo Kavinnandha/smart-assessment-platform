@@ -392,11 +392,6 @@ export default function SubjectsPage() {
     subject.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const totalChapters = subjects.reduce((acc, subject) => acc + subject.chapters.length, 0);
-  const totalTopics = subjects.reduce((acc, subject) => 
-    acc + subject.chapters.reduce((sum, chapter) => sum + chapter.topics.length, 0), 0
-  );
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -429,56 +424,6 @@ export default function SubjectsPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full"
         />
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Subjects</p>
-              <p className="text-2xl font-bold">{subjects.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <FolderOpen className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Chapters</p>
-              <p className="text-2xl font-bold">{totalChapters}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <List className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Topics</p>
-              <p className="text-2xl font-bold">{totalTopics}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Avg Topics/Chapter</p>
-              <p className="text-2xl font-bold">
-                {totalChapters > 0 ? (totalTopics / totalChapters).toFixed(1) : 0}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Subjects Grid */}

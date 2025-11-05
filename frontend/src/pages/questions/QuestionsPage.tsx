@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Download, Upload, BookOpen, ChevronRight } from 'lucide-react';
+import { Search, BookOpen, ChevronRight } from 'lucide-react';
 
 const QuestionsPage = () => {
   const navigate = useNavigate();
@@ -65,27 +65,9 @@ const QuestionsPage = () => {
     }
   };
 
-  const handleExportAll = async () => {
-    try {
-      const response = await api.get('/questions/export', {
-        responseType: 'blob'
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'all-questions.xlsx');
-      document.body.appendChild(link);
-      link.click();
-    } catch (error) {
-      console.error('Failed to export questions:', error);
-    }
-  };
-
   const filteredSubjects = subjects.filter(subject =>
     subject.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  const totalQuestions = subjects.reduce((acc, subject) => acc + subject.questionCount, 0);
 
   return (
     <div className="space-y-6">
@@ -94,16 +76,6 @@ const QuestionsPage = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Question Bank</h1>
           <p className="text-gray-600 mt-1">Browse questions by subject</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleExportAll} variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            Export All
-          </Button>
-          <Button onClick={() => window.location.href = '/questions/import'} variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
         </div>
       </div>
 
@@ -122,45 +94,6 @@ const QuestionsPage = () => {
             <Search className="h-4 w-4 mr-2" />
             Search
           </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Subjects</p>
-              <p className="text-2xl font-bold">{subjects.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Questions</p>
-              <p className="text-2xl font-bold">{totalQuestions}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Avg Questions/Subject</p>
-              <p className="text-2xl font-bold">
-                {subjects.length > 0 ? (totalQuestions / subjects.length).toFixed(1) : 0}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 

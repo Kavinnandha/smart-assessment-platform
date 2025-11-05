@@ -19,6 +19,8 @@ interface Question {
       fileType: string;
       fileSize: number;
     }>;
+    attachmentPosition?: 'before' | 'after' | 'custom';
+    questionType?: 'multiple-choice' | 'true-false' | 'short-answer' | 'long-answer';
     chapter: string;
     topic: string;
     difficultyLevel: string;
@@ -172,13 +174,20 @@ const TakeTestPage = () => {
 
     setSubmitting(true);
     try {
-      await api.post('/submissions', {
+      const response = await api.post('/submissions', {
         testId: test._id,
         answers: answers,
         timeTaken: (test.duration * 60) - timeRemaining
       });
       
-      alert('Test submitted successfully!');
+      const { autoGraded, totalMarksObtained } = response.data;
+      
+      if (autoGraded) {
+        alert(`Test submitted and auto-graded successfully!\n\nYour Score: ${totalMarksObtained} / ${test.totalMarks} marks`);
+      } else {
+        alert('Test submitted successfully! Results will be available after manual evaluation.');
+      }
+      
       navigate('/tests');
     } catch (error: any) {
       console.error('Failed to submit test:', error);
@@ -218,6 +227,463 @@ const TakeTestPage = () => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleString();
   };
+
+  const handleDownloadPDF = () => {
+    if (!test) return;
+
+    // Create a new window for printing
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow popups to download the PDF');
+      return;
+    }
+
+    // Helper function to render question with attachments
+    const renderQuestionTextWithAttachments = (questionText: string, attachments?: Array<{
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+      fileSize: number;
+    }>) => {
+      if (!attachments || attachments.length === 0) {
+        return questionText;
+      }
+
+      // Check if question text contains attachment placeholders
+      const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+      let processedText = questionText;
+      
+      // Replace placeholders with actual attachment HTML
+      processedText = processedText.replace(placeholderRegex, (match, index) => {
+        const attachmentIndex = parseInt(index);
+        if (attachmentIndex < attachments.length) {
+          const attachment = attachments[attachmentIndex];
+          const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+          
+          if (attachment.fileType.startsWith('image/')) {
+            return `<div style="margin: 12px 0;">
+              <img src="${fileUrl}" alt="${attachment.fileName}" style="max-width: 100%; max-height: 400px; border: 1px solid #e5e7eb; border-radius: 8px; display: block;" />
+              <p style="font-size: 11px; color: #6b7280; margin-top: 4px; font-style: italic;">${attachment.fileName}</p>
+            </div>`;
+          } else {
+            return `<div style="margin: 8px 0; padding: 8px; background-color: #f3f4f6; border-radius: 6px; border: 1px solid #d1d5db;">
+              <span style="font-size: 12px; color: #374151;">📎 Attachment: ${attachment.fileName}</span>
+              <br/><span style="font-size: 10px; color: #6b7280;">${fileUrl}</span>
+            </div>`;
+          }
+        }
+        return match;
+      });
+
+      return processedText;
+    };
+
+    // Helper function to render attachments section
+    const renderAttachmentsSection = (attachments: Array<{
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+      fileSize: number;
+    }>) => {
+      return attachments.map(attachment => {
+        const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+        
+        if (attachment.fileType.startsWith('image/')) {
+          return `<div style="margin: 12px 0;">
+            <img src="${fileUrl}" alt="${attachment.fileName}" style="max-width: 100%; max-height: 400px; border: 1px solid #e5e7eb; border-radius: 8px; display: block;" />
+            <p style="font-size: 11px; color: #6b7280; margin-top: 4px; font-style: italic;">${attachment.fileName}</p>
+          </div>`;
+        } else {
+          return `<div style="margin: 8px 0; padding: 8px; background-color: #f3f4f6; border-radius: 6px; border: 1px solid #d1d5db;">
+            <span style="font-size: 12px; color: #374151;">📎 ${attachment.fileName}</span>
+            <br/><span style="font-size: 10px; color: #6b7280;">URL: ${fileUrl}</span>
+          </div>`;
+        }
+      }).join('');
+    };
+
+    // Generate HTML content for the PDF
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${test.title} - Test Details</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            color: #1f2937;
+            line-height: 1.6;
+          }
+          
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #2563eb;
+          }
+          
+          .header h1 {
+            font-size: 28px;
+            color: #1e40af;
+            margin-bottom: 8px;
+          }
+          
+          .header p {
+            font-size: 16px;
+            color: #6b7280;
+          }
+          
+          .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+          }
+          
+          .status-published {
+            background-color: #d1fae5;
+            color: #065f46;
+          }
+          
+          .status-draft {
+            background-color: #fef3c7;
+            color: #92400e;
+          }
+          
+          .description {
+            background-color: #f3f4f6;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-style: italic;
+          }
+          
+          .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+          }
+          
+          .info-item {
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .info-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+          }
+          
+          .info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+          }
+          
+          .section {
+            margin: 30px 0;
+            page-break-inside: avoid;
+          }
+          
+          .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1e40af;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #dbeafe;
+          }
+          
+          .question-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            background-color: #ffffff;
+            page-break-inside: avoid;
+          }
+          
+          .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+          }
+          
+          .question-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background-color: #dbeafe;
+            color: #1e40af;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+          }
+          
+          .question-content {
+            flex: 1;
+            margin-left: 16px;
+          }
+          
+          .question-id {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 4px;
+          }
+          
+          .question-text {
+            font-size: 15px;
+            font-weight: 500;
+            color: #1f2937;
+            margin-bottom: 8px;
+          }
+          
+          .question-marks {
+            background-color: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+          }
+          
+          .question-meta {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #6b7280;
+          }
+          
+          .difficulty-badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: capitalize;
+          }
+          
+          .difficulty-easy {
+            background-color: #d1fae5;
+            color: #065f46;
+          }
+          
+          .difficulty-medium {
+            background-color: #fef3c7;
+            color: #92400e;
+          }
+          
+          .difficulty-hard {
+            background-color: #fee2e2;
+            color: #991b1b;
+          }
+          
+          .student-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+          }
+          
+          .student-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            background-color: #f9fafb;
+          }
+          
+          .student-name {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 2px;
+          }
+          
+          .student-email {
+            font-size: 13px;
+            color: #6b7280;
+          }
+          
+          .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+            text-align: center;
+            font-size: 12px;
+            color: #9ca3af;
+          }
+          
+          .no-data {
+            text-align: center;
+            color: #9ca3af;
+            padding: 20px;
+            font-style: italic;
+          }
+          
+          @media print {
+            body {
+              padding: 20px;
+            }
+            
+            .question-card, .section {
+              page-break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>${test.title}</h1>
+          <p>${test.subject?.name || 'N/A'}</p>
+          <span class="status-badge ${test.isPublished ? 'status-published' : 'status-draft'}">
+            ${test.isPublished ? 'Published' : 'Draft'}
+          </span>
+        </div>
+
+        ${test.description ? `
+          <div class="description">
+            ${test.description}
+          </div>
+        ` : ''}
+
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Duration</span>
+            <span class="info-value">${test.duration} minutes</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Total Questions</span>
+            <span class="info-value">${test.questions.length}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Total Marks</span>
+            <span class="info-value">${test.totalMarks}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Assigned Students</span>
+            <span class="info-value">${test.assignedTo.length}</span>
+          </div>
+          ${test.scheduledDate ? `
+            <div class="info-item">
+              <span class="info-label">Scheduled Date</span>
+              <span class="info-value">${formatDate(test.scheduledDate)}</span>
+            </div>
+          ` : ''}
+          ${test.deadline ? `
+            <div class="info-item">
+              <span class="info-label">Deadline</span>
+              <span class="info-value">${formatDate(test.deadline)}</span>
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Questions (${test.questions.length})</h2>
+          ${test.questions
+            .sort((a, b) => a.order - b.order)
+            .map((item, index) => {
+              const hasAttachments = item.question.attachments && item.question.attachments.length > 0;
+              const hasCustomPositioning = hasAttachments && item.question.questionText.includes('{{attachment:');
+              
+              // Render attachments before question if position is 'before'
+              const beforeAttachments = hasAttachments && item.question.attachmentPosition === 'before' 
+                ? renderAttachmentsSection(item.question.attachments!) 
+                : '';
+              
+              // Render question text with inline attachments if custom positioning
+              const questionTextHtml = hasCustomPositioning
+                ? renderQuestionTextWithAttachments(item.question.questionText, item.question.attachments!)
+                : item.question.questionText;
+              
+              // Render attachments after question if position is 'after' or undefined
+              const afterAttachments = hasAttachments && (!item.question.attachmentPosition || item.question.attachmentPosition === 'after')
+                ? renderAttachmentsSection(item.question.attachments!)
+                : '';
+              
+              return `
+                <div class="question-card">
+                  <div class="question-header">
+                    <div style="display: flex; align-items: flex-start; flex: 1;">
+                      <div class="question-number">${index + 1}</div>
+                      <div class="question-content">
+                        <div class="question-id">Q${item.question.questionNumber}</div>
+                        ${beforeAttachments}
+                        <div class="question-text">${questionTextHtml}</div>
+                        ${afterAttachments}
+                        <div class="question-meta">
+                          <span>Chapter: ${item.question.chapter}</span>
+                          ${item.question.topic ? `<span>Topic: ${item.question.topic}</span>` : ''}
+                          <span class="difficulty-badge difficulty-${item.question.difficultyLevel}">
+                            ${item.question.difficultyLevel}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="question-marks">${item.marks} marks</div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+        </div>
+
+        <div class="section">
+          <h2 class="section-title">Assigned Students (${test.assignedTo.length})</h2>
+          ${test.assignedTo.length === 0 ? `
+            <div class="no-data">No students assigned to this test</div>
+          ` : `
+            <div class="student-grid">
+              ${test.assignedTo.map(student => `
+                <div class="student-card">
+                  <div class="student-name">${student.name}</div>
+                  <div class="student-email">${student.email}</div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+
+        <div class="footer">
+          <p>Created by ${test.createdBy.name} on ${formatDate(test.createdAt)}</p>
+          <p style="margin-top: 8px;">Generated on ${new Date().toLocaleString()}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+
+    // Wait for content to load, then trigger print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print();
+        // Close the window after printing (user can cancel this)
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+      }, 250);
+    };
+  };
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -524,10 +990,6 @@ const TakeTestPage = () => {
                               className="max-w-md rounded-lg border mb-4"
                             />
                           )}
-                          <div className="flex gap-4 text-sm text-gray-600">
-                            <span>Chapter: {item.question.chapter}</span>
-                            {item.question.topic && <span>Topic: {item.question.topic}</span>}
-                          </div>
                         </div>
                         <span className="ml-4 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium shrink-0">
                           {item.marks} marks
@@ -535,15 +997,80 @@ const TakeTestPage = () => {
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Your Answer:
-                        </label>
-                        <Textarea
-                          value={answer?.answer || ''}
-                          onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
-                          placeholder="Type your answer here..."
-                          className="min-h-32"
-                        />
+                        {/* Multiple Choice Questions */}
+                        {item.question.questionType === 'multiple-choice' && item.question.options && item.question.options.length > 0 ? (
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Select your answer:
+                            </label>
+                            {item.question.options.map((option, optIndex) => (
+                              <label
+                                key={optIndex}
+                                className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                              >
+                                <input
+                                  type="radio"
+                                  name={`question-${item.question._id}`}
+                                  value={option}
+                                  checked={answer?.answer === option}
+                                  onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
+                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-3 text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : item.question.questionType === 'true-false' ? (
+                          /* True/False Questions */
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Select your answer:
+                            </label>
+                            {['True', 'False'].map((option) => (
+                              <label
+                                key={option}
+                                className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition"
+                              >
+                                <input
+                                  type="radio"
+                                  name={`question-${item.question._id}`}
+                                  value={option}
+                                  checked={answer?.answer === option}
+                                  onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
+                                  className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-3 text-gray-700">{option}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : item.question.questionType === 'short-answer' ? (
+                          /* Short Answer Questions */
+                          <>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Your Answer:
+                            </label>
+                            <Textarea
+                              value={answer?.answer || ''}
+                              onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
+                              placeholder="Type your answer here..."
+                              className="min-h-24"
+                              rows={3}
+                            />
+                          </>
+                        ) : (
+                          /* Long Answer Questions or Default */
+                          <>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Your Answer:
+                            </label>
+                            <Textarea
+                              value={answer?.answer || ''}
+                              onChange={(e) => handleAnswerChange(item.question._id, e.target.value)}
+                              placeholder="Type your answer here..."
+                              className="min-h-32"
+                            />
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -586,6 +1113,15 @@ const TakeTestPage = () => {
         </Button>
 
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleDownloadPDF}
+            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download PDF
+          </Button>
+          
           <Button
             variant="outline"
             onClick={() => navigate(`/tests/edit/${test._id}`)}

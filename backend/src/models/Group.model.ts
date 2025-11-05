@@ -3,6 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IGroup extends Document {
   name: string;
   description?: string;
+  subject: mongoose.Types.ObjectId;
   students: mongoose.Types.ObjectId[];
   teachers: mongoose.Types.ObjectId[];
   createdBy: mongoose.Types.ObjectId;
@@ -20,6 +21,11 @@ const GroupSchema = new Schema<IGroup>(
     description: {
       type: String,
       trim: true,
+    },
+    subject: {
+      type: Schema.Types.ObjectId,
+      ref: 'Subject',
+      required: [true, 'Subject is required'],
     },
     students: [
       {

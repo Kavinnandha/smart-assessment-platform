@@ -24,12 +24,12 @@ const DashboardLayout = () => {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'teacher', 'student'] },
-    { name: 'Questions', href: '/questions', icon: FileQuestion, roles: ['admin', 'teacher'] },
-    { name: 'Tests', href: '/tests', icon: FileText, roles: ['admin', 'teacher', 'student'] },
-    { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'teacher', 'student'] },
     { name: 'Subjects', href: '/subjects', icon: BookOpen, roles: ['admin'] },
     { name: 'Users', href: '/users', icon: Users, roles: ['admin'] },
     { name: 'Student Groups', href: '/student-groups', icon: UsersRound, roles: ['admin', 'teacher'] },
+    { name: 'Questions', href: '/questions', icon: FileQuestion, roles: ['admin', 'teacher'] },
+    { name: 'Tests', href: '/tests', icon: FileText, roles: ['admin', 'teacher', 'student'] },
+    { name: 'Reports', href: '/reports', icon: BarChart3, roles: ['admin', 'teacher', 'student'] },
   ];
 
   const filteredNavigation = navigation.filter(item => 

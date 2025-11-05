@@ -15,6 +15,7 @@ export const getGroups = async (req: Request, res: Response) => {
       .populate('students', 'name email')
       .populate('teachers', 'name email')
       .populate('createdBy', 'name email')
+      .populate('subject', 'name')
       .sort({ createdAt: -1 });
 
     res.json(groups);
@@ -34,7 +35,8 @@ export const getGroupById = async (req: Request, res: Response) => {
     const group = await Group.findById(id)
       .populate('students', 'name email')
       .populate('teachers', 'name email')
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('subject', 'name');
 
     if (!group) {
       return res.status(404).json({ message: 'Group not found' });
@@ -55,12 +57,16 @@ export const getGroupById = async (req: Request, res: Response) => {
 // Create a new group
 export const createGroup = async (req: Request, res: Response) => {
   try {
-    const { name, description, students, teachers } = req.body;
+    const { name, description, subject, students, teachers } = req.body;
     const userId = (req as any).user.userId;
 
     // Validate required fields
     if (!name || !name.trim()) {
       return res.status(400).json({ message: 'Group name is required' });
+    }
+
+    if (!subject) {
+      return res.status(400).json({ message: 'Subject is required' });
     }
 
     // Validate students are actual student users
@@ -94,6 +100,7 @@ export const createGroup = async (req: Request, res: Response) => {
     const group = new Group({
       name: name.trim(),
       description: description?.trim() || '',
+      subject: subject,
       students: students || [],
       teachers: teachers || [],
       createdBy: userId,
@@ -105,6 +112,7 @@ export const createGroup = async (req: Request, res: Response) => {
     await group.populate('students', 'name email');
     await group.populate('teachers', 'name email');
     await group.populate('createdBy', 'name email');
+    await group.populate('subject', 'name');
 
     res.status(201).json({
       message: 'Group created successfully',
@@ -120,7 +128,7 @@ export const createGroup = async (req: Request, res: Response) => {
 export const updateGroup = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description, students, teachers } = req.body;
+    const { name, description, subject, students, teachers } = req.body;
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
 
@@ -166,6 +174,7 @@ export const updateGroup = async (req: Request, res: Response) => {
     // Update fields
     if (name !== undefined) group.name = name.trim();
     if (description !== undefined) group.description = description.trim();
+    if (subject !== undefined) group.subject = subject;
     if (students !== undefined) group.students = students;
     if (teachers !== undefined) group.teachers = teachers;
 
@@ -175,6 +184,7 @@ export const updateGroup = async (req: Request, res: Response) => {
     await group.populate('students', 'name email');
     await group.populate('teachers', 'name email');
     await group.populate('createdBy', 'name email');
+    await group.populate('subject', 'name');
 
     res.json({
       message: 'Group updated successfully',
@@ -258,6 +268,7 @@ export const addStudentsToGroup = async (req: Request, res: Response) => {
 
     await group.populate('students', 'name email');
     await group.populate('createdBy', 'name email');
+    await group.populate('subject', 'name');
 
     res.json({
       message: 'Students added successfully',
@@ -304,6 +315,7 @@ export const removeStudentsFromGroup = async (req: Request, res: Response) => {
 
     await group.populate('students', 'name email');
     await group.populate('createdBy', 'name email');
+    await group.populate('subject', 'name');
 
     res.json({
       message: 'Students removed successfully',

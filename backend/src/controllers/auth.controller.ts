@@ -6,7 +6,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 export const register = async (req: AuthRequest, res: Response) => {
   try {
-    const { email, password, name, role, subjects } = req.body;
+    const { email, password, name, role } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -22,8 +22,7 @@ export const register = async (req: AuthRequest, res: Response) => {
       email,
       password: hashedPassword,
       name,
-      role: role || UserRole.STUDENT,
-      subjects: subjects || []
+      role: role || UserRole.STUDENT
     });
 
     await user.save();
@@ -42,8 +41,7 @@ export const register = async (req: AuthRequest, res: Response) => {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role,
-        subjects: user.subjects
+        role: user.role
       }
     });
   } catch (error) {
@@ -82,8 +80,7 @@ export const login = async (req: AuthRequest, res: Response) => {
         id: user._id,
         email: user.email,
         name: user.name,
-        role: user.role,
-        subjects: user.subjects
+        role: user.role
       }
     });
   } catch (error) {
