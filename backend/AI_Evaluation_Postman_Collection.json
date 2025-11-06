@@ -1,0 +1,222 @@
+{
+  "info": {
+    "name": "Smart Assessment - AI Evaluation",
+    "description": "API collection for AI-powered answer evaluation using LM Studio",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "AI Evaluation",
+      "item": [
+        {
+          "name": "AI Evaluate Entire Submission",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/submissions/:submissionId/ai-evaluate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "submissions", ":submissionId", "ai-evaluate"],
+              "variable": [
+                {
+                  "key": "submissionId",
+                  "value": "your-submission-id-here"
+                }
+              ]
+            },
+            "description": "Evaluates all unevaluated answers in a submission using AI. Only short-answer and long-answer questions are evaluated. MCQ and True/False questions are already auto-graded."
+          },
+          "response": []
+        },
+        {
+          "name": "AI Evaluate Single Answer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"questionId\": \"your-question-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/submissions/:submissionId/evaluate-answer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "submissions", ":submissionId", "evaluate-answer"],
+              "variable": [
+                {
+                  "key": "submissionId",
+                  "value": "your-submission-id-here"
+                }
+              ]
+            },
+            "description": "Evaluates a single answer within a submission using AI. Useful for re-evaluating specific answers or evaluating answers one at a time."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Regular Evaluation (Existing)",
+      "item": [
+        {
+          "name": "Get Submissions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/submissions?testId={{test_id}}&status=submitted",
+              "host": ["{{base_url}}"],
+              "path": ["api", "submissions"],
+              "query": [
+                {
+                  "key": "testId",
+                  "value": "{{test_id}}"
+                },
+                {
+                  "key": "status",
+                  "value": "submitted"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Submission by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/submissions/:submissionId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "submissions", ":submissionId"],
+              "variable": [
+                {
+                  "key": "submissionId",
+                  "value": "your-submission-id-here"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Manual Evaluate Submission",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testId\": \"test-id-here\",\n  \"answers\": [\n    {\n      \"question\": \"question-id-1\",\n      \"marksObtained\": 8.5,\n      \"remarks\": \"Good answer, covers most points\"\n    },\n    {\n      \"question\": \"question-id-2\",\n      \"marksObtained\": 7,\n      \"remarks\": \"Needs more detail\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/submissions/:submissionId/evaluate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "submissions", ":submissionId", "evaluate"],
+              "variable": [
+                {
+                  "key": "submissionId",
+                  "value": "your-submission-id-here"
+                }
+              ]
+            },
+            "description": "Manually evaluate a submission. Use this if you want to override AI evaluation or evaluate without AI."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Test LM Studio Connection",
+      "item": [
+        {
+          "name": "Check LM Studio API",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"oreal-deepseek-r1-distill-qwen-7b\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Hello! Are you working?\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "http://127.0.0.1:1234/v1/chat/completions",
+              "protocol": "http",
+              "host": ["127", "0", "0", "1"],
+              "port": "1234",
+              "path": ["v1", "chat", "completions"]
+            },
+            "description": "Test if LM Studio is running and responding. This should return a chat completion response."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "your-jwt-token-here",
+      "type": "string"
+    },
+    {
+      "key": "test_id",
+      "value": "your-test-id-here",
+      "type": "string"
+    }
+  ]
+}
