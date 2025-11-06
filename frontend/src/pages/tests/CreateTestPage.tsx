@@ -239,11 +239,19 @@ const CreateTestPage = () => {
   };
 
   const getAssignedStudents = (): string[] => {
-    if (assignmentType === 'group' && selectedGroup) {
-      const group = groups.find(g => g._id === selectedGroup);
-      return group ? group.students.map(s => s._id) : [];
+    // Only return individual students when assignment type is 'individual'
+    if (assignmentType === 'individual') {
+      return selectedStudents;
     }
-    return selectedStudents;
+    return [];
+  };
+
+  const getAssignedGroups = (): string[] => {
+    // Only return groups when assignment type is 'group'
+    if (assignmentType === 'group' && selectedGroup) {
+      return [selectedGroup];
+    }
+    return [];
   };
 
   const handleAutoGenerate = async () => {
@@ -318,6 +326,7 @@ const CreateTestPage = () => {
       setLoading(true);
       const totalMarks = selectedQuestions.reduce((sum, q) => sum + q.marks, 0);
       const assignedStudents = getAssignedStudents();
+      const assignedGroups = getAssignedGroups();
 
       const payload = {
         title: formData.title,
@@ -327,6 +336,7 @@ const CreateTestPage = () => {
         totalMarks,
         questions: selectedQuestions,
         assignedTo: assignedStudents,
+        assignedGroups: assignedGroups,
         scheduledDate: formData.scheduledDate || undefined,
         deadline: formData.deadline || undefined,
         isPublished: publish

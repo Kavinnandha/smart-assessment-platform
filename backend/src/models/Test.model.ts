@@ -14,7 +14,8 @@ export interface ITest extends Document {
   totalMarks: number;
   questions: ITestQuestion[];
   createdBy: mongoose.Types.ObjectId;
-  assignedTo: mongoose.Types.ObjectId[]; // Student IDs
+  assignedTo: mongoose.Types.ObjectId[]; // Student IDs (for individual assignment)
+  assignedGroups: mongoose.Types.ObjectId[]; // Group IDs (for group assignment)
   scheduledDate?: Date;
   deadline?: Date;
   isPublished: boolean;
@@ -70,6 +71,10 @@ const testSchema = new Schema<ITest>(
       type: Schema.Types.ObjectId,
       ref: 'User'
     }],
+    assignedGroups: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Group'
+    }],
     scheduledDate: {
       type: Date
     },
@@ -89,6 +94,7 @@ const testSchema = new Schema<ITest>(
 // Indexes
 testSchema.index({ createdBy: 1 });
 testSchema.index({ assignedTo: 1 });
+testSchema.index({ assignedGroups: 1 });
 testSchema.index({ scheduledDate: 1 });
 
 export default mongoose.model<ITest>('Test', testSchema);

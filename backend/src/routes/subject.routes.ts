@@ -1,14 +1,33 @@
 import express from 'express';
 import Subject from '../models/Subject.model';
-import { authenticate, authorize } from '../middleware/auth.middleware';
+import Group from '../models/Group.model';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth.middleware';
 import { UserRole } from '../models/User.model';
 
 const router = express.Router();
 
 // Get all subjects (accessible to all authenticated users)
-router.get('/', authenticate, async (req, res) => {
+// For teachers: only return subjects assigned to them via groups
+router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
-    const subjects = await Subject.find().sort({ name: 1 });
+    let subjects;
+    
+    // If user is a teacher, filter subjects based on assigned groups
+    if (req.user?.role === UserRole.TEACHER) {
+      // Find all groups where the teacher is assigned
+      const teacherGroups = await Group.find({ 
+        teachers: req.user.userId 
+      }).distinct('subject');
+      
+      // Get only the subjects from those groups
+      subjects = await Subject.find({ 
+        _id: { $in: teacherGroups } 
+      }).sort({ name: 1 });
+    } else {
+      // For admin and students, show all subjects
+      subjects = await Subject.find().sort({ name: 1 });
+    }
+    
     res.json(subjects);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Server error' });

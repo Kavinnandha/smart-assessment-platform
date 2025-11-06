@@ -1,7 +1,9 @@
 import { Response } from 'express';
 import Question, { DifficultyLevel } from '../models/Question.model';
 import Subject from '../models/Subject.model';
+import Group from '../models/Group.model';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { UserRole } from '../models/User.model';
 import XLSX from 'xlsx';
 
 export const createQuestion = async (req: AuthRequest, res: Response) => {
@@ -33,6 +35,17 @@ export const getQuestions = async (req: AuthRequest, res: Response) => {
         { questionText: { $regex: search, $options: 'i' } },
         { questionNumber: { $regex: search, $options: 'i' } }
       ];
+    }
+
+    // If user is a teacher, filter questions based on assigned subjects
+    if (req.user?.role === UserRole.TEACHER) {
+      // Find all groups where the teacher is assigned
+      const teacherGroups = await Group.find({ 
+        teachers: req.user.userId 
+      }).distinct('subject');
+      
+      // Add subject filter to only show questions from assigned subjects
+      filter.subject = { $in: teacherGroups };
     }
 
     const questions = await Question.find(filter)

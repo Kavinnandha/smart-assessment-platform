@@ -1,18 +1,40 @@
 import { Response } from 'express';
 import Test from '../models/Test.model';
+import Group from '../models/Group.model';
 import Question, { DifficultyLevel } from '../models/Question.model';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { UserRole } from '../models/User.model';
 
 export const createTest = async (req: AuthRequest, res: Response) => {
   try {
+    // If assignedGroups is provided, populate assignedTo with students from those groups
+    let assignedStudents = req.body.assignedTo || [];
+    
+    if (req.body.assignedGroups && req.body.assignedGroups.length > 0) {
+      // Fetch all groups and extract student IDs
+      const groups = await Group.find({ _id: { $in: req.body.assignedGroups } });
+      const studentIds = new Set(assignedStudents); // Use Set to avoid duplicates
+      
+      groups.forEach(group => {
+        group.students.forEach(studentId => {
+          studentIds.add(studentId.toString());
+        });
+      });
+      
+      assignedStudents = Array.from(studentIds);
+    }
+    
     const test = new Test({
       ...req.body,
+      assignedTo: assignedStudents,
       createdBy: req.user?.userId
     });
 
     await test.save();
     await test.populate('questions.question');
     await test.populate('subject', 'name');
+    await test.populate('assignedGroups', 'name');
+    await test.populate('assignedTo', 'name email');
     
     res.status(201).json({ message: 'Test created successfully', test });
   } catch (error) {
@@ -139,13 +161,41 @@ export const getTests = async (req: AuthRequest, res: Response) => {
       filter.assignedTo = req.user.userId;
       filter.isPublished = true;
     } else if (req.user?.role === 'teacher') {
-      filter.createdBy = req.user.userId;
+      // Teachers can see:
+      // 1. Tests assigned to groups where they are teachers (ALL teachers in the group can see)
+      // 2. Tests they created with individual student assignment (ONLY creator can see)
+      
+      // Find all groups where the teacher is assigned
+      const teacherGroups = await Group.find({ 
+        teachers: req.user.userId 
+      }).select('_id');
+      
+      const teacherGroupIds = teacherGroups.map(g => g._id);
+      
+      // Build OR conditions:
+      filter.$or = [
+        // Condition 1: Tests assigned to groups where this teacher is a member
+        // This allows ALL teachers in the group to see and manage the test
+        { assignedGroups: { $in: teacherGroupIds } },
+        
+        // Condition 2: Tests created by this teacher with no group assignment
+        // This is for individual student assignments (makeup tests, etc.)
+        // ONLY the creator can see these tests
+        { 
+          createdBy: req.user.userId, 
+          $or: [
+            { assignedGroups: { $exists: true, $size: 0 } },  // Empty array
+            { assignedGroups: { $exists: false } }             // Field doesn't exist (backward compatibility)
+          ]
+        }
+      ];
     }
 
     const tests = await Test.find(filter)
       .populate('createdBy', 'name email')
       .populate('subject', 'name')
       .populate('questions.question')
+      .populate('assignedGroups', 'name')
       .sort({ createdAt: -1 });
 
     res.json({ tests });
@@ -161,7 +211,8 @@ export const getTestById = async (req: AuthRequest, res: Response) => {
       .populate('createdBy', 'name email')
       .populate('subject', 'name')
       .populate('questions.question')
-      .populate('assignedTo', 'name email');
+      .populate('assignedTo', 'name email')
+      .populate('assignedGroups', 'name');
 
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
@@ -176,13 +227,32 @@ export const getTestById = async (req: AuthRequest, res: Response) => {
 
 export const updateTest = async (req: AuthRequest, res: Response) => {
   try {
+    // If assignedGroups is provided, populate assignedTo with students from those groups
+    let updateData = { ...req.body };
+    
+    if (req.body.assignedGroups && req.body.assignedGroups.length > 0) {
+      // Fetch all groups and extract student IDs
+      const groups = await Group.find({ _id: { $in: req.body.assignedGroups } });
+      const studentIds = new Set(req.body.assignedTo || []); // Use Set to avoid duplicates
+      
+      groups.forEach(group => {
+        group.students.forEach(studentId => {
+          studentIds.add(studentId.toString());
+        });
+      });
+      
+      updateData.assignedTo = Array.from(studentIds);
+    }
+    
     const test = await Test.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     )
       .populate('questions.question')
-      .populate('subject', 'name');
+      .populate('subject', 'name')
+      .populate('assignedGroups', 'name')
+      .populate('assignedTo', 'name email');
 
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
