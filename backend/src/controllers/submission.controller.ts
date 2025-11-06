@@ -1,9 +1,11 @@
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import Submission from '../models/Submission.model';
 import Test from '../models/Test.model';
 import Question from '../models/Question.model';
 import { AuthRequest } from '../middleware/auth.middleware';
 import XLSX from 'xlsx';
+import { evaluateAnswerWithAI, batchEvaluateWithAI, EvaluationRequest } from '../services/ai-evaluation.service';
 
 export const createSubmission = async (req: AuthRequest, res: Response) => {
   try {
@@ -304,5 +306,308 @@ export const exportSubmissions = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('Export submissions error:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * AI-powered evaluation of a submission
+ * Uses local LM Studio model to evaluate student answers against correct answers
+ * Works with all subjects and handles pending/submitted status
+ * @route PUT /api/submissions/:id/ai-evaluate
+ */
+export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
+  try {
+    const submissionId = req.params.id;
+    const { forceReEvaluate } = req.query; // Optional: allow re-evaluation
+
+    // Get submission with populated data (including subject info)
+    const submission = await Submission.findById(submissionId)
+      .populate({
+        path: 'test',
+        populate: [
+          {
+            path: 'questions.question',
+            populate: {
+              path: 'subject',
+              select: 'name code'
+            }
+          },
+          {
+            path: 'subject',
+            select: 'name code'
+          }
+        ]
+      })
+      .populate('answers.question');
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    const test = submission.test as any;
+
+    if (!test || !test.questions) {
+      return res.status(400).json({ message: 'Test data not found' });
+    }
+
+    // Check submission status - allow pending and submitted
+    if (submission.status === 'evaluated' && !forceReEvaluate) {
+      return res.status(400).json({ 
+        message: 'Submission has already been evaluated. Use ?forceReEvaluate=true to re-evaluate.',
+        currentStatus: submission.status,
+        evaluatedAt: submission.evaluatedAt,
+        totalMarksObtained: submission.totalMarksObtained
+      });
+    }
+
+    // Log evaluation start with subject info
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`AI Evaluation Started`);
+    console.log(`Submission ID: ${submissionId}`);
+    console.log(`Test: ${test.title}`);
+    if (test.subject) {
+      console.log(`Subject: ${test.subject.name} (${test.subject.code || 'N/A'})`);
+    }
+    console.log(`Status: ${submission.status}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    // Prepare evaluation requests for all answers
+    const evaluationRequests: EvaluationRequest[] = [];
+    const answerMapping: any[] = [];
+
+    for (const answer of submission.answers) {
+      const question = answer.question as any;
+      
+      // Find the corresponding test question to get max marks
+      const testQuestion = test.questions.find(
+        (tq: any) => tq.question._id.toString() === question._id.toString()
+      );
+
+      if (!testQuestion) {
+        continue;
+      }
+
+      const maxMarks = testQuestion.marks;
+
+      // Only evaluate questions that need evaluation (not MCQ or True/False)
+      if (question.questionType === 'short-answer' || question.questionType === 'long-answer') {
+        evaluationRequests.push({
+          questionText: question.questionText,
+          correctAnswer: question.correctAnswer || 'No model answer provided',
+          studentAnswer: answer.answerText || '',
+          maxMarks: maxMarks
+        });
+
+        answerMapping.push({
+          questionId: question._id,
+          maxMarks: maxMarks
+        });
+      }
+    }
+
+    if (evaluationRequests.length === 0) {
+      // Check if all questions are already graded
+      const allAnswersGraded = submission.answers.every(
+        (ans: any) => ans.marksObtained !== undefined && ans.marksObtained !== null
+      );
+
+      if (allAnswersGraded) {
+        return res.status(400).json({ 
+          message: 'No questions to evaluate. All questions are already graded (auto-graded or manually evaluated).',
+          suggestion: 'Use ?forceReEvaluate=true to re-evaluate or use manual evaluation to adjust marks.'
+        });
+      } else {
+        return res.status(400).json({ 
+          message: 'No subjective questions found to evaluate. Only MCQ/True-False questions exist or questions lack correct answers.',
+          tip: 'Ensure questions have correctAnswer field populated in the database.'
+        });
+      }
+    }
+
+    // Evaluate using AI
+    console.log(`🤖 Starting AI evaluation for ${evaluationRequests.length} answer(s)...`);
+    console.log(`📚 Subject: ${test.subject?.name || 'Unknown'}`);
+    console.log(`⏳ Estimated time: ${evaluationRequests.length * 3}-${evaluationRequests.length * 5} seconds\n`);
+    
+    const evaluationResults = await batchEvaluateWithAI(evaluationRequests);
+    
+    console.log(`✅ AI evaluation completed for ${evaluationResults.length} answer(s)\n`);
+
+    // Update submission with AI evaluation results
+    const updatedAnswers = submission.answers.map((answer) => {
+      const question = answer.question as any;
+      const mappingIndex = answerMapping.findIndex(
+        (m: any) => m.questionId.toString() === question._id.toString()
+      );
+
+      if (mappingIndex !== -1) {
+        const evaluation = evaluationResults[mappingIndex];
+        return {
+          question: answer.question,
+          answerText: answer.answerText,
+          answerImage: answer.answerImage,
+          marksObtained: evaluation.marksObtained,
+          remarks: `AI Evaluation: ${evaluation.feedback}`
+        };
+      }
+
+      return answer;
+    });
+
+    // Calculate total marks
+    const totalMarksObtained = updatedAnswers.reduce(
+      (sum: number, ans: any) => sum + (ans.marksObtained || 0),
+      0
+    );
+
+    // Update submission
+    submission.answers = updatedAnswers;
+    submission.totalMarksObtained = totalMarksObtained;
+    submission.evaluatedBy = req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : undefined;
+    submission.evaluatedAt = new Date();
+    submission.status = 'evaluated';
+
+    await submission.save();
+
+    // Log completion
+    console.log(`${'='.repeat(60)}`);
+    console.log(`✅ AI Evaluation Completed Successfully`);
+    console.log(`Total Marks Obtained: ${totalMarksObtained}/${test.questions.reduce((sum: number, q: any) => sum + q.marks, 0)}`);
+    console.log(`Questions Evaluated: ${evaluationRequests.length}`);
+    console.log(`${'='.repeat(60)}\n`);
+
+    res.json({
+      message: 'Submission evaluated successfully using AI',
+      submission: await Submission.findById(submissionId)
+        .populate('student', 'name email')
+        .populate({
+          path: 'test',
+          select: 'title subject totalMarks',
+          populate: {
+            path: 'subject',
+            select: 'name code'
+          }
+        })
+        .populate('answers.question')
+        .populate('evaluatedBy', 'name email'),
+      evaluationDetails: {
+        totalQuestionsEvaluated: evaluationRequests.length,
+        totalQuestions: submission.answers.length,
+        totalMarksObtained,
+        subject: test.subject?.name || 'Unknown',
+        aiModel: 'LM Studio - Local AI',
+        evaluatedAt: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('AI Evaluate submission error:', error);
+    res.status(500).json({ 
+      message: 'Server error during AI evaluation',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+/**
+ * AI-powered evaluation of a single answer within a submission
+ * @route POST /api/submissions/:id/evaluate-answer
+ */
+export const aiEvaluateSingleAnswer = async (req: AuthRequest, res: Response) => {
+  try {
+    const submissionId = req.params.id;
+    const { questionId } = req.body;
+
+    // Get submission
+    const submission = await Submission.findById(submissionId)
+      .populate({
+        path: 'test',
+        populate: {
+          path: 'questions.question'
+        }
+      })
+      .populate('answers.question');
+
+    if (!submission) {
+      return res.status(404).json({ message: 'Submission not found' });
+    }
+
+    const test = submission.test as any;
+
+    // Find the specific answer
+    const answerIndex = submission.answers.findIndex(
+      (ans: any) => ans.question._id.toString() === questionId
+    );
+
+    if (answerIndex === -1) {
+      return res.status(404).json({ message: 'Answer not found in submission' });
+    }
+
+    const answer = submission.answers[answerIndex];
+    const question = answer.question as any;
+
+    // Find max marks for this question
+    const testQuestion = test.questions.find(
+      (tq: any) => tq.question._id.toString() === questionId
+    );
+
+    if (!testQuestion) {
+      return res.status(404).json({ message: 'Question not found in test' });
+    }
+
+    const maxMarks = testQuestion.marks;
+
+    // Evaluate using AI
+    const evaluation = await evaluateAnswerWithAI({
+      questionText: question.questionText,
+      correctAnswer: question.correctAnswer || 'No model answer provided',
+      studentAnswer: answer.answerText || '',
+      maxMarks: maxMarks
+    });
+
+    // Update the specific answer
+    submission.answers[answerIndex].marksObtained = evaluation.marksObtained;
+    submission.answers[answerIndex].remarks = `AI Evaluation: ${evaluation.feedback}`;
+
+    // Recalculate total marks
+    const totalMarksObtained = submission.answers.reduce(
+      (sum: number, ans: any) => sum + (ans.marksObtained || 0),
+      0
+    );
+
+    submission.totalMarksObtained = totalMarksObtained;
+
+    // Check if all answers are evaluated
+    const allEvaluated = submission.answers.every(
+      (ans: any) => ans.marksObtained !== undefined && ans.marksObtained !== null
+    );
+
+    if (allEvaluated && submission.status !== 'evaluated') {
+      submission.status = 'evaluated';
+      submission.evaluatedBy = req.user?.userId ? new mongoose.Types.ObjectId(req.user.userId) : undefined;
+      submission.evaluatedAt = new Date();
+    }
+
+    await submission.save();
+
+    res.json({
+      message: 'Answer evaluated successfully using AI',
+      evaluation: {
+        questionId: questionId,
+        marksObtained: evaluation.marksObtained,
+        maxMarks: maxMarks,
+        feedback: evaluation.feedback,
+        evaluationDetails: evaluation.evaluationDetails
+      },
+      submission: {
+        totalMarksObtained: submission.totalMarksObtained,
+        status: submission.status
+      }
+    });
+  } catch (error) {
+    console.error('AI Evaluate answer error:', error);
+    res.status(500).json({ 
+      message: 'Server error during AI evaluation',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };

@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, User, Calendar, Clock, FileText, CheckCircle, AlertCircle, Download, File } from 'lucide-react';
+import { ArrowLeft, Save, User, Calendar, Clock, FileText, CheckCircle, AlertCircle, Download, File, Sparkles, Loader2 } from 'lucide-react';
 
 interface Question {
   _id: string;
@@ -75,6 +75,7 @@ const EvaluatePage = () => {
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiEvaluating, setAiEvaluating] = useState(false);
   const [evaluatedAnswers, setEvaluatedAnswers] = useState<EvaluatedAnswer[]>([]);
   
   // Get API base URL for file uploads
@@ -129,6 +130,41 @@ const EvaluatePage = () => {
 
   const calculateTotalMarks = () => {
     return evaluatedAnswers.reduce((sum, ans) => sum + (ans.marksObtained || 0), 0);
+  };
+
+  const handleAIEvaluate = async () => {
+    if (!submission) return;
+
+    const confirm = window.confirm(
+      'This will use AI to automatically evaluate all subjective questions. ' +
+      'MCQ and True/False questions are already graded.\n\n' +
+      'The AI will compare student answers with the correct answers in the database.\n\n' +
+      'Continue with AI evaluation?'
+    );
+
+    if (!confirm) return;
+
+    setAiEvaluating(true);
+    try {
+      const response = await api.put(`/submissions/${id}/ai-evaluate`);
+      
+      alert(
+        `AI Evaluation Completed!\n\n` +
+        `Questions Evaluated: ${response.data.evaluationDetails.totalQuestionsEvaluated}\n` +
+        `Total Marks: ${response.data.evaluationDetails.totalMarksObtained}/${maxMarks}\n` +
+        `Subject: ${response.data.evaluationDetails.subject}\n\n` +
+        `The submission has been updated with AI evaluation results. You can review and adjust marks if needed.`
+      );
+      
+      // Reload submission to get updated marks and remarks
+      await fetchSubmission();
+    } catch (error: any) {
+      console.error('AI Evaluation failed:', error);
+      const errorMessage = error.response?.data?.message || 'AI evaluation failed. Please check:\n1. LM Studio is running\n2. Questions have correct answers in database\n3. Backend server is responding';
+      alert(`AI Evaluation Error:\n\n${errorMessage}`);
+    } finally {
+      setAiEvaluating(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -333,7 +369,28 @@ const EvaluatePage = () => {
           {isStudent ? 'Back to Tests' : 'Back to Submissions'}
         </Button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* AI Evaluate Button - Only for Teachers */}
+          {!isStudent && (submission.status === 'pending' || submission.status === 'submitted') && (
+            <Button
+              onClick={handleAIEvaluate}
+              disabled={aiEvaluating}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {aiEvaluating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  AI Evaluating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  AI Evaluate
+                </>
+              )}
+            </Button>
+          )}
+
           {submission.status === 'evaluated' ? (
             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium flex items-center gap-1">
               <CheckCircle className="h-4 w-4" />
@@ -591,29 +648,67 @@ const EvaluatePage = () => {
       {!isStudent && (
         <div className="mt-6 bg-white p-6 rounded-lg shadow sticky bottom-0">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">
-                Total: <span className="text-2xl font-bold text-blue-600">{totalMarks.toFixed(1)}</span> / {maxMarks}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                {percentage.toFixed(1)}% - {
-                  percentage >= 75 ? 'Excellent' :
-                  percentage >= 60 ? 'Good' :
-                  percentage >= 50 ? 'Average' :
-                  percentage >= 35 ? 'Below Average' :
-                  'Needs Improvement'
-                }
-              </p>
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-sm text-gray-600">
+                  Total: <span className="text-2xl font-bold text-blue-600">{totalMarks.toFixed(1)}</span> / {maxMarks}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {percentage.toFixed(1)}% - {
+                    percentage >= 75 ? 'Excellent' :
+                    percentage >= 60 ? 'Good' :
+                    percentage >= 50 ? 'Average' :
+                    percentage >= 35 ? 'Below Average' :
+                    'Needs Improvement'
+                  }
+                </p>
+              </div>
+
+              {/* AI Evaluate info */}
+              {(submission.status === 'pending' || submission.status === 'submitted') && (
+                <div className="border-l pl-6">
+                  <p className="text-xs text-purple-600 font-medium mb-1">💡 Quick Tip</p>
+                  <p className="text-xs text-gray-600">
+                    Use "AI Evaluate" button above to<br />
+                    automatically grade subjective answers
+                  </p>
+                </div>
+              )}
             </div>
-            <Button
-              onClick={handleSubmit}
-              disabled={saving}
-              size="lg"
-              className="bg-green-600 hover:bg-green-700"
-            >
-              <Save className="h-5 w-5 mr-2" />
-              {saving ? 'Saving...' : submission.status === 'evaluated' ? 'Update Evaluation' : 'Save Evaluation'}
-            </Button>
+
+            <div className="flex gap-3">
+              {(submission.status === 'pending' || submission.status === 'submitted') && (
+                <Button
+                  onClick={handleAIEvaluate}
+                  disabled={aiEvaluating}
+                  size="lg"
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-50"
+                >
+                  {aiEvaluating ? (
+                    <>
+                      <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                      AI Evaluating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5 mr-2" />
+                      AI Evaluate
+                    </>
+                  )}
+                </Button>
+              )}
+              
+              <Button
+                onClick={handleSubmit}
+                disabled={saving}
+                size="lg"
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Save className="h-5 w-5 mr-2" />
+                {saving ? 'Saving...' : submission.status === 'evaluated' ? 'Update Evaluation' : 'Save Evaluation'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

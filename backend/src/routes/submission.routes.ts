@@ -6,7 +6,9 @@ import {
   getSubmissionById,
   evaluateSubmission,
   bulkEvaluate,
-  exportSubmissions
+  exportSubmissions,
+  aiEvaluateSubmission,
+  aiEvaluateSingleAnswer
 } from '../controllers/submission.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { UserRole } from '../models/User.model';
@@ -31,5 +33,9 @@ router.get('/:id', authenticate, getSubmissionById);
 
 // Evaluate submission (Teacher/Admin)
 router.put('/:id/evaluate', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), evaluateSubmission);
+
+// AI-powered evaluation routes (Teacher/Admin)
+router.put('/:id/ai-evaluate', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), aiEvaluateSubmission);
+router.post('/:id/evaluate-answer', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), aiEvaluateSingleAnswer);
 
 export default router;
