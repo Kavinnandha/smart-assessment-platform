@@ -19,6 +19,12 @@ interface Question {
       fileType: string;
       fileSize: number;
     }>;
+    correctAnswerAttachments?: Array<{
+      fileName: string;
+      fileUrl: string;
+      fileType: string;
+      fileSize: number;
+    }>;
     attachmentPosition?: 'before' | 'after' | 'custom';
     questionType?: 'multiple-choice' | 'true-false' | 'short-answer' | 'long-answer';
     chapter: string;
@@ -625,7 +631,7 @@ const TakeTestPage = () => {
                     <div style="display: flex; align-items: flex-start; flex: 1;">
                       <div class="question-number">${index + 1}</div>
                       <div class="question-content">
-                        <div class="question-id">Q${item.question.questionNumber}</div>
+                        <div class="question-id">Q${index + 1}</div>
                         ${beforeAttachments}
                         <div class="question-text">${questionTextHtml}</div>
                         ${afterAttachments}
@@ -1258,7 +1264,7 @@ const TakeTestPage = () => {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <p className="text-sm text-gray-500">
-                          Q{item.question.questionNumber}
+                          Q{index + 1}
                         </p>
                         <div className="mt-1">
                           {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}

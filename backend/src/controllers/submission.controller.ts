@@ -149,7 +149,7 @@ export const getSubmissionById = async (req: AuthRequest, res: Response) => {
         path: 'test',
         populate: {
           path: 'questions.question subject',
-          select: 'questionNumber questionText questionImage chapter topic marks name'
+          select: 'questionText questionImage chapter topic marks name'
         }
       })
       .populate('answers.question')
@@ -269,7 +269,7 @@ export const exportSubmissions = async (req: AuthRequest, res: Response) => {
     const submissions = await Submission.find({ test: testId })
       .populate('student', 'name email')
       .populate('test', 'title')
-      .populate('answers.question', 'questionNumber questionText')
+      .populate('answers.question', 'questionText')
       .lean();
 
     const exportData: any[] = [];

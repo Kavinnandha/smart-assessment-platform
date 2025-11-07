@@ -18,6 +18,12 @@ interface Question {
     fileType: string;
     fileSize: number;
   }>;
+  correctAnswerAttachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
   chapter: string;
   topic: string;
   marks: number;
@@ -531,7 +537,7 @@ const EvaluatePage = () => {
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
                         <p className="text-xs text-gray-500 mb-1">
-                          Q{answer.question.questionNumber}
+                          Q{index + 1}
                         </p>
                         {renderQuestionWithAttachments(answer.question.questionText, answer.question.attachments)}
                         {answer.question.questionImage && (
@@ -561,6 +567,51 @@ const EvaluatePage = () => {
                       {answer.answer || answer.answerText || 'No answer provided'}
                     </p>
                   </div>
+
+                  {/* Reference Answer Attachments - Only show to teachers */}
+                  {!isStudent && answer.question.correctAnswerAttachments && answer.question.correctAnswerAttachments.length > 0 && (
+                    <div className="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-sm font-medium text-green-900 mb-3 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        Reference Answer Attachments
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {answer.question.correctAnswerAttachments.map((attachment, idx) => {
+                          const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                          return (
+                            <div key={idx} className="border border-green-300 rounded-lg overflow-hidden bg-white">
+                              {attachment.fileType.startsWith('image/') ? (
+                                <div className="relative">
+                                  <img 
+                                    src={fileUrl}
+                                    alt={attachment.fileName}
+                                    className="w-full h-48 object-contain bg-gray-50"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-center h-48 bg-gray-50">
+                                  <File className="w-12 h-12 text-gray-400" />
+                                </div>
+                              )}
+                              <div className="p-2 border-t border-green-200 bg-green-50">
+                                <a 
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs font-medium text-green-900 hover:text-green-700 truncate block"
+                                >
+                                  {attachment.fileName}
+                                </a>
+                                <p className="text-xs text-green-700">
+                                  {(attachment.fileSize / 1024).toFixed(2)} KB
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Evaluation Section */}
                   {isStudent ? (

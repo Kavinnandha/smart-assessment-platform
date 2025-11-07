@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Search, Download, Trash2, BookOpen, FileText, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Download, Trash2, BookOpen, FileText, FileSpreadsheet, ChevronDown, Eye, File } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
@@ -12,6 +12,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Chapter {
   name: string;
@@ -32,6 +39,12 @@ const SubjectQuestionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState({ chapter: '', topic: '', difficulty: '' });
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
+
+  // Get API base URL for file attachments
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
 
   useEffect(() => {
     fetchSubjectAndQuestions();
@@ -90,6 +103,251 @@ const SubjectQuestionsPage = () => {
       console.error('Failed to delete question:', error);
       alert('Failed to delete question');
     }
+  };
+
+  const handleViewDetails = async (questionId: string) => {
+    try {
+      const response = await api.get(`/questions/${questionId}`);
+      setSelectedQuestion(response.data.question);
+      setViewDetailsOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch question details:', error);
+      alert('Failed to load question details');
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
+  // Helper function to render question text with inline attachments
+  const renderQuestionWithAttachments = (questionText: string, attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>, attachmentPosition?: string) => {
+    if (!attachments || attachments.length === 0) {
+      return <p className="text-base whitespace-pre-wrap">{questionText}</p>;
+    }
+
+    // If position is 'before', show attachments before the text
+    if (attachmentPosition === 'before') {
+      return (
+        <>
+          <div className="mb-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'blue'))}
+          </div>
+          <p className="text-base whitespace-pre-wrap">{questionText}</p>
+        </>
+      );
+    }
+
+    // If position is 'after' or undefined, show attachments after the text
+    if (attachmentPosition === 'after' || !attachmentPosition) {
+      return (
+        <>
+          <p className="text-base whitespace-pre-wrap">{questionText}</p>
+          <div className="mt-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'blue'))}
+          </div>
+        </>
+      );
+    }
+
+    // If position is 'custom', check for placeholders and render inline
+    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+    const hasPlaceholders = placeholderRegex.test(questionText);
+
+    if (!hasPlaceholders) {
+      // No placeholders found, display attachments at the end (backward compatibility)
+      return (
+        <>
+          <p className="text-base whitespace-pre-wrap">{questionText}</p>
+          <div className="mt-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'blue'))}
+          </div>
+        </>
+      );
+    }
+
+    // Split text by placeholders and render inline
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    const matches = questionText.matchAll(/\{\{attachment:(\d+)\}\}/g);
+
+    for (const match of matches) {
+      const matchIndex = match.index!;
+      const attachmentIndex = parseInt(match[1]);
+
+      // Add text before placeholder
+      if (matchIndex > lastIndex) {
+        parts.push(questionText.substring(lastIndex, matchIndex));
+      }
+
+      // Add attachment
+      if (attachmentIndex < attachments.length) {
+        parts.push(
+          <div key={`attachment-${attachmentIndex}`} className="my-3">
+            {renderAttachment(attachments[attachmentIndex], attachmentIndex, 'blue')}
+          </div>
+        );
+      }
+
+      lastIndex = matchIndex + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < questionText.length) {
+      parts.push(questionText.substring(lastIndex));
+    }
+
+    return (
+      <div className="text-base whitespace-pre-wrap">
+        {parts.map((part, idx) => 
+          typeof part === 'string' ? <span key={idx}>{part}</span> : part
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to render correct answer with inline attachments
+  const renderAnswerWithAttachments = (answerText: string, attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>, attachmentPosition?: string) => {
+    if (!attachments || attachments.length === 0) {
+      return <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>;
+    }
+
+    // If position is 'before', show attachments before the text
+    if (attachmentPosition === 'before') {
+      return (
+        <>
+          <div className="mb-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
+          </div>
+          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+        </>
+      );
+    }
+
+    // If position is 'after' or undefined, show attachments after the text
+    if (attachmentPosition === 'after' || !attachmentPosition) {
+      return (
+        <>
+          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+          <div className="mt-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
+          </div>
+        </>
+      );
+    }
+
+    // If position is 'custom', check for placeholders and render inline
+    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+    const hasPlaceholders = placeholderRegex.test(answerText);
+
+    if (!hasPlaceholders) {
+      // No placeholders found, display attachments at the end
+      return (
+        <>
+          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+          <div className="mt-4 space-y-2">
+            {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
+          </div>
+        </>
+      );
+    }
+
+    // Split text by placeholders and render inline
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    const matches = answerText.matchAll(/\{\{attachment:(\d+)\}\}/g);
+
+    for (const match of matches) {
+      const matchIndex = match.index!;
+      const attachmentIndex = parseInt(match[1]);
+
+      // Add text before placeholder
+      if (matchIndex > lastIndex) {
+        parts.push(answerText.substring(lastIndex, matchIndex));
+      }
+
+      // Add attachment
+      if (attachmentIndex < attachments.length) {
+        parts.push(
+          <div key={`answer-attachment-${attachmentIndex}`} className="my-3">
+            {renderAttachment(attachments[attachmentIndex], attachmentIndex, 'green')}
+          </div>
+        );
+      }
+
+      lastIndex = matchIndex + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < answerText.length) {
+      parts.push(answerText.substring(lastIndex));
+    }
+
+    return (
+      <div className="text-base whitespace-pre-wrap text-green-900">
+        {parts.map((part, idx) => 
+          typeof part === 'string' ? <span key={idx}>{part}</span> : part
+        )}
+      </div>
+    );
+  };
+
+  // Helper function to render a single attachment
+  const renderAttachment = (attachment: {
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }, idx: number, colorTheme: 'blue' | 'green') => {
+    const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+    const borderColor = colorTheme === 'blue' ? 'border-blue-300' : 'border-green-300';
+    const bgColor = colorTheme === 'blue' ? 'bg-blue-50' : 'bg-green-50';
+    const textColor = colorTheme === 'blue' ? 'text-blue-900' : 'text-green-900';
+    const hoverColor = colorTheme === 'blue' ? 'hover:text-blue-700' : 'hover:text-green-700';
+
+    return (
+      <div key={idx} className={`border ${borderColor} rounded-lg overflow-hidden bg-white inline-block max-w-full`}>
+        {attachment.fileType.startsWith('image/') ? (
+          <div className="relative bg-gray-100">
+            <img
+              src={fileUrl}
+              alt={attachment.fileName}
+              className="max-w-full max-h-96 object-contain"
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-40 bg-gray-50">
+            <File className="w-12 h-12 text-gray-400" />
+          </div>
+        )}
+        <div className={`p-2 border-t ${borderColor} ${bgColor}`}>
+          <a 
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`text-xs font-medium ${textColor} ${hoverColor} truncate block`}
+          >
+            {attachment.fileName}
+          </a>
+          <p className={`text-xs ${textColor}`}>
+            {formatFileSize(attachment.fileSize)}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   const handleExport = async () => {
@@ -187,7 +445,7 @@ const SubjectQuestionsPage = () => {
 
         // Questions table
         const tableData = chapterQuestions.map((q: any, index: number) => [
-          q.questionNumber || `Q${index + 1}`,
+          `Q${index + 1}`,
           q.topic || '-',
           q.difficultyLevel || '-',
           q.marks?.toString() || '-',
@@ -649,7 +907,7 @@ const SubjectQuestionsPage = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {chapterQuestions.map((q: any) => (
                       <tr key={q._id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">{q.questionNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap font-medium">{`Q${chapterQuestions.indexOf(q) + 1}`}</td>
                         <td className="px-6 py-4">{q.topic || '-'}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -663,6 +921,15 @@ const SubjectQuestionsPage = () => {
                         <td className="px-6 py-4">{q.marks}</td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => handleViewDetails(q._id)}
+                              className="gap-1"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View
+                            </Button>
                             <Link to={`/questions/edit/${q._id}/${subjectId}`}>
                               <Button size="sm" variant="outline">Edit</Button>
                             </Link>
@@ -685,6 +952,217 @@ const SubjectQuestionsPage = () => {
           ))
         )}
       </div>
+
+      {/* View Details Dialog */}
+      <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Question Details</DialogTitle>
+            <DialogDescription>
+              Complete information about this question including attachments and answer
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedQuestion && (
+            <div className="space-y-6 mt-4">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Chapter</p>
+                  <p className="text-base font-semibold">{selectedQuestion.chapter}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Topic</p>
+                  <p className="text-base font-semibold">{selectedQuestion.topic || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Difficulty</p>
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                    selectedQuestion.difficultyLevel === 'easy' ? 'bg-green-100 text-green-800' :
+                    selectedQuestion.difficultyLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedQuestion.difficultyLevel}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Marks</p>
+                  <p className="text-base font-semibold">{selectedQuestion.marks}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Question Type</p>
+                  <p className="text-base font-semibold capitalize">{selectedQuestion.questionType?.replace('-', ' ')}</p>
+                </div>
+              </div>
+
+              {/* Question Text */}
+              <div className="p-4 border rounded-lg">
+                <p className="text-sm font-medium text-gray-700 mb-2">Question</p>
+                {renderQuestionWithAttachments(
+                  selectedQuestion.questionText,
+                  selectedQuestion.attachments,
+                  selectedQuestion.attachmentPosition
+                )}
+              </div>
+
+              {/* Question Attachments - Only show separately if not using custom positioning */}
+              {selectedQuestion.attachments && 
+               selectedQuestion.attachments.length > 0 && 
+               selectedQuestion.attachmentPosition !== 'custom' &&
+               selectedQuestion.attachmentPosition !== 'before' &&
+               selectedQuestion.attachmentPosition !== 'after' && (
+                <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-blue-900">
+                      Question Attachments ({selectedQuestion.attachments.length})
+                    </p>
+                    {selectedQuestion.attachmentPosition && (
+                      <span className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded">
+                        Position: {selectedQuestion.attachmentPosition}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedQuestion.attachments.map((attachment: any, idx: number) => {
+                      const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                      return (
+                        <div key={idx} className="border border-blue-300 rounded-lg overflow-hidden bg-white">
+                          {attachment.fileType.startsWith('image/') ? (
+                            <div className="relative h-40 bg-gray-100 flex items-center justify-center">
+                              <img
+                                src={fileUrl}
+                                alt={attachment.fileName}
+                                className="max-w-full max-h-full object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-40 bg-gray-50">
+                              <File className="w-12 h-12 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="p-2 border-t border-blue-200 bg-blue-50">
+                            <a 
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-blue-900 hover:text-blue-700 truncate block"
+                            >
+                              {attachment.fileName}
+                            </a>
+                            <p className="text-xs text-blue-700">
+                              {formatFileSize(attachment.fileSize)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Options (for MCQ and True/False) */}
+              {selectedQuestion.options && selectedQuestion.options.length > 0 && (
+                <div className="p-4 border rounded-lg">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Options</p>
+                  <div className="space-y-2">
+                    {selectedQuestion.options.map((option: string, idx: number) => (
+                      <div 
+                        key={idx} 
+                        className={`p-3 rounded-lg ${
+                          option === selectedQuestion.correctAnswer 
+                            ? 'bg-green-100 border border-green-300' 
+                            : 'bg-gray-50 border border-gray-200'
+                        }`}
+                      >
+                        <span className="font-medium">{String.fromCharCode(65 + idx)}.</span> {option}
+                        {option === selectedQuestion.correctAnswer && (
+                          <span className="ml-2 text-xs font-semibold text-green-700">✓ Correct</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Correct Answer */}
+              <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                <p className="text-sm font-medium text-green-900 mb-2">Correct Answer</p>
+                {renderAnswerWithAttachments(
+                  selectedQuestion.correctAnswer,
+                  selectedQuestion.correctAnswerAttachments,
+                  selectedQuestion.correctAnswerAttachmentPosition
+                )}
+              </div>
+
+              {/* Correct Answer Attachments - Only show separately if not using custom positioning */}
+              {selectedQuestion.correctAnswerAttachments && 
+               selectedQuestion.correctAnswerAttachments.length > 0 && 
+               selectedQuestion.correctAnswerAttachmentPosition !== 'custom' &&
+               selectedQuestion.correctAnswerAttachmentPosition !== 'before' &&
+               selectedQuestion.correctAnswerAttachmentPosition !== 'after' && (
+                <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-green-900">
+                      Answer Attachments ({selectedQuestion.correctAnswerAttachments.length})
+                    </p>
+                    {selectedQuestion.correctAnswerAttachmentPosition && (
+                      <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded">
+                        Position: {selectedQuestion.correctAnswerAttachmentPosition}
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {selectedQuestion.correctAnswerAttachments.map((attachment: any, idx: number) => {
+                      const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                      return (
+                        <div key={idx} className="border border-green-300 rounded-lg overflow-hidden bg-white">
+                          {attachment.fileType.startsWith('image/') ? (
+                            <div className="relative h-40 bg-gray-100 flex items-center justify-center">
+                              <img
+                                src={fileUrl}
+                                alt={attachment.fileName}
+                                className="max-w-full max-h-full object-contain"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-40 bg-gray-50">
+                              <File className="w-12 h-12 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="p-2 border-t border-green-200 bg-green-50">
+                            <a 
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs font-medium text-green-900 hover:text-green-700 truncate block"
+                            >
+                              {attachment.fileName}
+                            </a>
+                            <p className="text-xs text-green-700">
+                              {formatFileSize(attachment.fileSize)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Footer Info */}
+              <div className="pt-4 border-t text-sm text-gray-500">
+                <p>Created by: {selectedQuestion.createdBy?.name || 'Unknown'}</p>
+                <p>Created: {new Date(selectedQuestion.createdAt).toLocaleString()}</p>
+                {selectedQuestion.updatedAt && selectedQuestion.updatedAt !== selectedQuestion.createdAt && (
+                  <p>Last Updated: {new Date(selectedQuestion.updatedAt).toLocaleString()}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

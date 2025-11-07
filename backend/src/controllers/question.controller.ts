@@ -32,8 +32,7 @@ export const getQuestions = async (req: AuthRequest, res: Response) => {
     if (subject) filter.subject = subject;
     if (search) {
       filter.$or = [
-        { questionText: { $regex: search, $options: 'i' } },
-        { questionNumber: { $regex: search, $options: 'i' } }
+        { questionText: { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -125,7 +124,6 @@ export const importQuestions = async (req: AuthRequest, res: Response) => {
     const data = XLSX.utils.sheet_to_json(worksheet);
 
     const questions = data.map((row: any) => ({
-      questionNumber: row['Question Number'] || row.questionNumber,
       chapter: row['Chapter'] || row.chapter,
       topic: row['Topic'] || row.topic,
       marks: Number(row['Marks'] || row.marks),
@@ -156,7 +154,6 @@ export const exportQuestions = async (req: AuthRequest, res: Response) => {
     const questions = await Question.find(filter).lean();
 
     const exportData = questions.map(q => ({
-      'Question Number': q.questionNumber,
       'Chapter': q.chapter,
       'Topic': q.topic,
       'Marks': q.marks,

@@ -900,9 +900,9 @@ const CreateTestPage = () => {
                               </td>
                             </tr>
                           ) : (
-                            questions.map((q) => (
+                            questions.map((q, idx) => (
                               <tr key={q._id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3">{q.questionNumber}</td>
+                                <td className="px-4 py-3">{`Q${idx + 1}`}</td>
                                 <td className="px-4 py-3 max-w-md truncate">{q.questionText}</td>
                                 <td className="px-4 py-3">{q.chapter}</td>
                                 <td className="px-4 py-3">
@@ -957,7 +957,7 @@ const CreateTestPage = () => {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {selectedQuestions.map((sq) => {
+                            {selectedQuestions.map((sq) => {
                       const question = getQuestionDetails(sq.question);
                       return (
                         <div
@@ -967,7 +967,7 @@ const CreateTestPage = () => {
                           <span className="font-medium text-gray-700">#{sq.order}</span>
                           <div className="flex-1">
                             <p className="text-sm font-medium">
-                              {question?.questionNumber || 'Question'}
+                              {question?.questionText ? (question.questionText.substring(0, 60) + (question.questionText.length > 60 ? '...' : '')) : 'Question'}
                             </p>
                             <p className="text-xs text-gray-600 truncate">
                               {question?.questionText || sq.question}

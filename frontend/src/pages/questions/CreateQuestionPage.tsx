@@ -33,10 +33,12 @@ const CreateQuestionPage = () => {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [correctAnswerAttachments, setCorrectAnswerAttachments] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAnswer, setUploadingAnswer] = useState(false);
   const [showAttachmentHelper, setShowAttachmentHelper] = useState(false);
+  const [showAnswerAttachmentHelper, setShowAnswerAttachmentHelper] = useState(false);
   const [formData, setFormData] = useState({
-    questionNumber: '',
     chapter: '',
     topic: '',
     marks: '',
@@ -45,7 +47,8 @@ const CreateQuestionPage = () => {
     subject: '',
     questionType: 'short-answer',
     correctAnswer: '',
-    attachmentPosition: 'after'
+    attachmentPosition: 'after',
+    correctAnswerAttachmentPosition: 'after'
   });
   const [options, setOptions] = useState<string[]>(['', '', '', '']); // For MCQ and True/False
 
@@ -89,7 +92,6 @@ const CreateQuestionPage = () => {
       const question = response.data.question;
       
       setFormData({
-        questionNumber: question.questionNumber || '',
         chapter: question.chapter || '',
         topic: question.topic || '',
         marks: question.marks?.toString() || '',
@@ -98,7 +100,8 @@ const CreateQuestionPage = () => {
         subject: question.subject?._id || '',
         questionType: question.questionType || 'short-answer',
         correctAnswer: question.correctAnswer || '',
-        attachmentPosition: question.attachmentPosition || 'after'
+        attachmentPosition: question.attachmentPosition || 'after',
+        correctAnswerAttachmentPosition: question.correctAnswerAttachmentPosition || 'after'
       });
 
       // Load options for MCQ/True-False
@@ -109,6 +112,11 @@ const CreateQuestionPage = () => {
       // Load attachments if they exist
       if (question.attachments && question.attachments.length > 0) {
         setAttachments(question.attachments);
+      }
+
+      // Load correct answer attachments if they exist
+      if (question.correctAnswerAttachments && question.correctAnswerAttachments.length > 0) {
+        setCorrectAnswerAttachments(question.correctAnswerAttachments);
       }
 
       // The selectedSubject will be set by the useEffect when subjects are loaded
@@ -222,6 +230,47 @@ const CreateQuestionPage = () => {
     setAttachments(attachments.filter((_, i) => i !== index));
   };
 
+  const handleAnswerFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingAnswer(true);
+    try {
+      const uploadedFiles: Attachment[] = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await api.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        uploadedFiles.push({
+          fileName: file.name,
+          fileUrl: response.data.fileUrl,
+          fileType: file.type,
+          fileSize: file.size,
+        });
+      }
+
+      setCorrectAnswerAttachments([...correctAnswerAttachments, ...uploadedFiles]);
+      alert(`${uploadedFiles.length} answer attachment(s) uploaded successfully!`);
+    } catch (error) {
+      console.error('Failed to upload answer files:', error);
+      alert('Failed to upload answer files');
+    } finally {
+      setUploadingAnswer(false);
+    }
+  };
+
+  const handleRemoveAnswerAttachment = (index: number) => {
+    setCorrectAnswerAttachments(correctAnswerAttachments.filter((_, i) => i !== index));
+  };
+
   const insertAttachmentPlaceholder = (attachmentIndex: number) => {
     const placeholder = `{{attachment:${attachmentIndex}}}`;
     const textarea = document.getElementById('questionText') as HTMLTextAreaElement;
@@ -248,6 +297,32 @@ const CreateQuestionPage = () => {
     return formData.questionText.match(placeholderRegex) || [];
   };
 
+  const insertAnswerAttachmentPlaceholder = (attachmentIndex: number) => {
+    const placeholder = `{{answerAttachment:${attachmentIndex}}}`;
+    const textarea = document.getElementById('correctAnswer') as HTMLTextAreaElement;
+    
+    if (textarea) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = formData.correctAnswer;
+      const newText = text.substring(0, start) + placeholder + text.substring(end);
+      
+      setFormData({ ...formData, correctAnswer: newText });
+      
+      // Set cursor position after the inserted placeholder
+      setTimeout(() => {
+        textarea.focus();
+        const newPosition = start + placeholder.length;
+        textarea.setSelectionRange(newPosition, newPosition);
+      }, 0);
+    }
+  };
+
+  const getAnswerAttachmentPlaceholderPreview = () => {
+    const placeholderRegex = /\{\{answerAttachment:(\d+)\}\}/g;
+    return formData.correctAnswer.match(placeholderRegex) || [];
+  };
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -270,10 +345,12 @@ const CreateQuestionPage = () => {
         ...formData,
         marks: Number(formData.marks),
         attachments: attachments,
+        correctAnswerAttachments: correctAnswerAttachments,
         options: (formData.questionType === 'multiple-choice' || formData.questionType === 'true-false') ? options : undefined,
         questionType: formData.questionType,
         correctAnswer: formData.correctAnswer,
-        attachmentPosition: formData.attachmentPosition
+        attachmentPosition: formData.attachmentPosition,
+        correctAnswerAttachmentPosition: formData.correctAnswerAttachmentPosition
       };
 
       if (isEditMode) {
@@ -432,17 +509,7 @@ const CreateQuestionPage = () => {
               <p className="text-sm text-amber-600 mt-1">⚠️ No topics available for this chapter. Please add topics in Subject Management.</p>
             )}
           </div>
-          <div>
-            <Label htmlFor="questionNumber">Question Number *</Label>
-            <Input
-              id="questionNumber"
-              name="questionNumber"
-              value={formData.questionNumber}
-              onChange={handleChange}
-              required
-              placeholder="Q1"
-            />
-          </div>
+          
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -656,6 +723,227 @@ const CreateQuestionPage = () => {
             />
           )}
         </div>
+
+        {/* Correct Answer Attachments Section - Only for subjective questions */}
+        {(formData.questionType === 'short-answer' || formData.questionType === 'long-answer') && (
+          <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <Label className="text-base font-semibold text-blue-900">
+                Correct Answer Attachments (Optional)
+              </Label>
+              {correctAnswerAttachments.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="correctAnswerAttachmentPosition" className="text-xs text-blue-900">Position:</Label>
+                  <select
+                    id="correctAnswerAttachmentPosition"
+                    name="correctAnswerAttachmentPosition"
+                    value={formData.correctAnswerAttachmentPosition}
+                    onChange={handleChange}
+                    className="text-xs rounded-md border border-blue-300 bg-white px-2 py-1 text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="before">Before Answer</option>
+                    <option value="after">After Answer (Default)</option>
+                    <option value="custom">Custom (use placeholders)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+            
+            {/* Show helper text based on position */}
+            {correctAnswerAttachments.length > 0 && (
+              <div className="mb-3 text-xs bg-white border border-blue-300 rounded-md p-3">
+                {formData.correctAnswerAttachmentPosition === 'before' && (
+                  <div>
+                    <p className="font-semibold text-blue-900 mb-1">📍 Before Answer</p>
+                    <p className="text-blue-700">Attachments will appear before the correct answer text.</p>
+                  </div>
+                )}
+                {formData.correctAnswerAttachmentPosition === 'after' && (
+                  <div>
+                    <p className="font-semibold text-blue-900 mb-1">📍 After Answer (Default)</p>
+                    <p className="text-blue-700">Attachments will appear after the correct answer text.</p>
+                  </div>
+                )}
+                {formData.correctAnswerAttachmentPosition === 'custom' && (
+                  <div>
+                    <p className="font-semibold text-blue-900 mb-1">📍 Custom Position</p>
+                    <p className="text-blue-700 mb-2">
+                      Place attachments anywhere in your answer text using placeholders:
+                    </p>
+                    <div className="space-y-1">
+                      {correctAnswerAttachments.map((_, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <code className="bg-blue-100 px-2 py-1 rounded border border-blue-400 font-mono text-xs">
+                            {'{{answerAttachment:' + index + '}}'}
+                          </code>
+                          <span className="text-blue-600 text-xs">→ {correctAnswerAttachments[index].fileName}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-blue-700 mt-2">
+                      Type these placeholders in your answer text or use the "Show Attachment Inserter" button below.
+                    </p>
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAnswerAttachmentHelper(!showAnswerAttachmentHelper)}
+                        className="text-xs border-blue-300 text-blue-900 hover:bg-blue-100"
+                      >
+                        {showAnswerAttachmentHelper ? 'Hide' : 'Show'} Attachment Inserter
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Attachment Inserter Helper for Answer - Only show when custom position is selected */}
+            {showAnswerAttachmentHelper && correctAnswerAttachments.length > 0 && formData.correctAnswerAttachmentPosition === 'custom' && (
+              <div className="border border-blue-300 bg-white rounded-lg p-3 mb-3">
+                <Label className="text-xs font-semibold mb-2 block text-blue-900">Quick Insert Answer Attachment</Label>
+                <p className="text-xs text-blue-700 mb-2">
+                  Click the cursor in the answer text where you want to insert an attachment, then click a button below:
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {correctAnswerAttachments.map((attachment, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => insertAnswerAttachmentPlaceholder(index)}
+                      className="text-xs flex items-center gap-2 justify-start border-blue-300 hover:bg-blue-50"
+                    >
+                      <span className="font-mono bg-blue-100 px-1.5 py-0.5 rounded border border-blue-400 text-xs">
+                        {index}
+                      </span>
+                      <span className="truncate text-blue-900">{attachment.fileName}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-blue-700 mb-3">
+              Upload reference images, diagrams, or documents that show the model/correct answer
+            </p>
+
+            {/* File Upload Button for Answer */}
+            <div className="mb-4">
+              <label className="flex items-center justify-center w-full h-24 px-4 transition bg-white border-2 border-blue-300 border-dashed rounded-md appearance-none cursor-pointer hover:border-blue-400 focus:outline-none">
+                <div className="flex flex-col items-center space-y-2">
+                  <Upload className="w-6 h-6 text-blue-500" />
+                  <span className="font-medium text-blue-700 text-sm">
+                    {uploadingAnswer ? 'Uploading...' : 'Click to upload answer attachments'}
+                  </span>
+                  <span className="text-xs text-blue-600">
+                    Images, PDFs (Max 10MB per file)
+                  </span>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  multiple
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                  onChange={handleAnswerFileUpload}
+                  disabled={uploadingAnswer}
+                />
+              </label>
+            </div>
+
+            {/* Uploaded Answer Attachments List */}
+            {correctAnswerAttachments.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-blue-900">
+                  Uploaded Answer Attachments ({correctAnswerAttachments.length})
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {correctAnswerAttachments.map((attachment, index) => {
+                    const backendBaseUrl = import.meta.env.VITE_API_URL 
+                      ? import.meta.env.VITE_API_URL.replace('/api', '') 
+                      : 'http://localhost:5000';
+                    const fileUrl = `${backendBaseUrl}${attachment.fileUrl}`;
+                    
+                    // Check if this attachment is used in answer text
+                    const placeholderRegex = new RegExp(`\\{\\{answerAttachment:${index}\\}\\}`, 'g');
+                    const isUsedInAnswer = placeholderRegex.test(formData.correctAnswer);
+
+                    return (
+                      <div
+                        key={index}
+                        className={`border rounded-lg overflow-hidden bg-white relative ${
+                          isUsedInAnswer ? 'border-green-400 ring-2 ring-green-200' : 'border-blue-300'
+                        }`}
+                      >
+                        {/* Index Badge */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold shadow-lg ${
+                            isUsedInAnswer 
+                              ? 'bg-green-500 text-white' 
+                              : 'bg-blue-500 text-white'
+                          }`}>
+                            {index}
+                          </span>
+                        </div>
+
+                        {/* Preview Section */}
+                        {attachment.fileType.startsWith('image/') ? (
+                          <div className="relative h-32 bg-gray-100 flex items-center justify-center">
+                            <img
+                              src={fileUrl}
+                              alt={attachment.fileName}
+                              className="max-w-full max-h-full object-contain"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center h-32 bg-gray-50">
+                            <FileText className="w-12 h-12 text-gray-400" />
+                          </div>
+                        )}
+                        
+                        {/* File Info Section */}
+                        <div className={`p-2 border-t ${
+                          isUsedInAnswer ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'
+                        }`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">
+                                {attachment.fileName}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(attachment.fileSize)}
+                              </p>
+                              {isUsedInAnswer && (
+                                <p className="text-xs text-green-700 font-medium mt-1">
+                                  ✓ Used in answer
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-600 font-mono mt-1 bg-white px-1.5 py-0.5 rounded border inline-block">
+                                {'{{answerAttachment:' + index + '}}'}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRemoveAnswerAttachment(index)}
+                              className="shrink-0 h-7 w-7 p-0"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Attachments Section */}
         <div className="border-t pt-4">

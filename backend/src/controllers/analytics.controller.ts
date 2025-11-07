@@ -188,13 +188,12 @@ export const getTestAnalytics = async (req: AuthRequest, res: Response) => {
       });
 
       questionAnalysis.push({
-        questionNumber: question.questionNumber,
-        questionText: question.questionText.substring(0, 100) + '...',
-        totalMarks: question.marks,
-        averageMarks: attemptedCount > 0 ? totalObtained / attemptedCount : 0,
-        attemptedBy: attemptedCount,
-        difficulty: question.difficultyLevel
-      });
+          questionText: question.questionText.substring(0, 100) + '...',
+          totalMarks: question.marks,
+          averageMarks: attemptedCount > 0 ? totalObtained / attemptedCount : 0,
+          attemptedBy: attemptedCount,
+          difficulty: question.difficultyLevel
+        });
     });
 
     const analytics = {

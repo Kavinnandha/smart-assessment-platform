@@ -20,7 +20,6 @@ export enum AttachmentPosition {
 }
 
 export interface IQuestion extends Document {
-  questionNumber: string;
   chapter: string;
   topic?: string;
   marks: number;
@@ -37,6 +36,13 @@ export interface IQuestion extends Document {
   attachmentPosition?: AttachmentPosition;
   options?: string[];
   correctAnswer?: string;
+  correctAnswerAttachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+  correctAnswerAttachmentPosition?: AttachmentPosition;
   subject: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -45,10 +51,6 @@ export interface IQuestion extends Document {
 
 const questionSchema = new Schema<IQuestion>(
   {
-    questionNumber: {
-      type: String,
-      required: true
-    },
     chapter: {
       type: String,
       required: true
@@ -109,6 +111,29 @@ const questionSchema = new Schema<IQuestion>(
     correctAnswer: {
       type: String,
       required: true
+    },
+    correctAnswerAttachments: [{
+      fileName: {
+        type: String,
+        required: true
+      },
+      fileUrl: {
+        type: String,
+        required: true
+      },
+      fileType: {
+        type: String,
+        required: true
+      },
+      fileSize: {
+        type: Number,
+        required: true
+      }
+    }],
+    correctAnswerAttachmentPosition: {
+      type: String,
+      enum: Object.values(AttachmentPosition),
+      default: AttachmentPosition.AFTER
     },
     subject: {
       type: Schema.Types.ObjectId,
