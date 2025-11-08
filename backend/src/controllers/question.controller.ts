@@ -23,13 +23,21 @@ export const createQuestion = async (req: AuthRequest, res: Response) => {
 
 export const getQuestions = async (req: AuthRequest, res: Response) => {
   try {
-    const { chapter, topic, difficultyLevel, subject, search } = req.query;
+    const { chapter, topic, difficultyLevel, subject, search, minMarks, maxMarks } = req.query;
     
     const filter: any = {};
     if (chapter) filter.chapter = chapter;
     if (topic) filter.topic = topic;
     if (difficultyLevel) filter.difficultyLevel = difficultyLevel;
     if (subject) filter.subject = subject;
+    
+    // Handle marks filtering
+    if (minMarks || maxMarks) {
+      filter.marks = {};
+      if (minMarks) filter.marks.$gte = parseInt(minMarks as string);
+      if (maxMarks) filter.marks.$lte = parseInt(maxMarks as string);
+    }
+    
     if (search) {
       filter.$or = [
         { questionText: { $regex: search, $options: 'i' } }
@@ -146,10 +154,17 @@ export const importQuestions = async (req: AuthRequest, res: Response) => {
 
 export const exportQuestions = async (req: AuthRequest, res: Response) => {
   try {
-    const { subject, chapter } = req.query;
+    const { subject, chapter, minMarks, maxMarks } = req.query;
     const filter: any = {};
     if (subject) filter.subject = subject;
     if (chapter) filter.chapter = chapter;
+    
+    // Handle marks filtering
+    if (minMarks || maxMarks) {
+      filter.marks = {};
+      if (minMarks) filter.marks.$gte = parseInt(minMarks as string);
+      if (maxMarks) filter.marks.$lte = parseInt(maxMarks as string);
+    }
 
     const questions = await Question.find(filter).lean();
 

@@ -4,7 +4,8 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, Plus, Trash2, Wand2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Search, Plus, Trash2, Wand2, ChevronUp, ChevronDown, Eye, X } from 'lucide-react';
 
 interface Question {
   _id: string;
@@ -14,6 +15,24 @@ interface Question {
   topic: string;
   marks: number;
   difficultyLevel: 'easy' | 'medium' | 'hard';
+  questionType?: 'multiple-choice' | 'true-false' | 'short-answer' | 'long-answer';
+  questionImage?: string;
+  options?: string[];
+  correctAnswer?: string;
+  answerLines?: number;
+  tags?: string[];
+  attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+  correctAnswerAttachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
   subject: {
     _id: string;
     name: string;
@@ -48,6 +67,14 @@ interface SelectedQuestion {
   question: string;
   marks: number;
   order: number;
+  section?: string;
+}
+
+interface TestSection {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
 }
 
 const CreateTestPage = () => {
@@ -62,12 +89,20 @@ const CreateTestPage = () => {
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<SelectedQuestion[]>([]);
+  const [sections, setSections] = useState<TestSection[]>([
+    { id: 'default', name: 'Section A', description: 'Main questions', order: 1 }
+  ]);
+  const [selectedSectionForQuestion, setSelectedSectionForQuestion] = useState<string>('default');
+  const [isAddingSectionMode, setIsAddingSectionMode] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [assignmentType, setAssignmentType] = useState<'individual' | 'group'>('group');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(false);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -75,7 +110,8 @@ const CreateTestPage = () => {
     description: '',
     duration: '60',
     scheduledDate: '',
-    deadline: ''
+    deadline: '',
+    showResultsImmediately: false
   });
 
   const [autoGenSettings, setAutoGenSettings] = useState({
@@ -83,13 +119,18 @@ const CreateTestPage = () => {
     easyPercentage: '40',
     mediumPercentage: '40',
     hardPercentage: '20',
-    chapters: [] as string[]
+    chapters: [] as string[],
+    topics: [] as string[],
+    questionTypes: [] as string[],
+    specificMarks: [] as number[]
   });
 
   const [filters, setFilters] = useState({
     subject: '',
     chapter: '',
-    difficulty: ''
+    difficulty: '',
+    minMarks: '',
+    maxMarks: ''
   });
 
   useEffect(() => {
@@ -101,11 +142,26 @@ const CreateTestPage = () => {
     }
   }, []);
 
+  // Clear topics when chapters change
   useEffect(() => {
-    if (mode === 'manual' && filters.subject) {
-      fetchQuestions();
+    setAutoGenSettings(prev => ({
+      ...prev,
+      topics: []
+    }));
+  }, [autoGenSettings.chapters]);
+
+  useEffect(() => {
+    if (mode === 'manual') {
+      // Debounce the API call for marks filters to avoid too many requests while typing
+      const timeoutId = setTimeout(() => {
+        if (filters.subject || filters.chapter || filters.difficulty || filters.minMarks || filters.maxMarks || searchQuery) {
+          fetchQuestions();
+        }
+      }, 300); // 300ms delay
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [filters, mode]);
+  }, [filters, mode, searchQuery]);
 
   const fetchTest = async () => {
     try {
@@ -120,7 +176,8 @@ const CreateTestPage = () => {
         description: test.description || '',
         duration: test.duration?.toString() || '60',
         scheduledDate: test.scheduledDate ? new Date(test.scheduledDate).toISOString().slice(0, 16) : '',
-        deadline: test.deadline ? new Date(test.deadline).toISOString().slice(0, 16) : ''
+        deadline: test.deadline ? new Date(test.deadline).toISOString().slice(0, 16) : '',
+        showResultsImmediately: test.showResultsImmediately || false
       });
 
       // Set filters for question loading
@@ -133,9 +190,15 @@ const CreateTestPage = () => {
         const selectedQs = test.questions.map((q: any) => ({
           question: q.question._id || q.question,
           marks: q.marks,
-          order: q.order
+          order: q.order,
+          section: q.section || 'default'
         }));
         setSelectedQuestions(selectedQs);
+      }
+
+      // Set sections
+      if (test.sections && test.sections.length > 0) {
+        setSections(test.sections);
       }
 
       // Set selected students
@@ -166,6 +229,8 @@ const CreateTestPage = () => {
       if (filters.subject) params.subject = filters.subject;
       if (filters.chapter) params.chapter = filters.chapter;
       if (filters.difficulty) params.difficultyLevel = filters.difficulty;
+      if (filters.minMarks) params.minMarks = filters.minMarks;
+      if (filters.maxMarks) params.maxMarks = filters.maxMarks;
       if (searchQuery) params.search = searchQuery;
 
       const response = await api.get('/questions', { params });
@@ -202,7 +267,8 @@ const CreateTestPage = () => {
     const newQuestion: SelectedQuestion = {
       question: question._id,
       marks: question.marks,
-      order: selectedQuestions.length + 1
+      order: selectedQuestions.length + 1,
+      section: selectedSectionForQuestion
     };
 
     setSelectedQuestions([...selectedQuestions, newQuestion]);
@@ -220,6 +286,198 @@ const CreateTestPage = () => {
       q.question === questionId ? { ...q, marks } : q
     );
     setSelectedQuestions(updated);
+  };
+
+  const moveQuestionUp = (questionId: string) => {
+    const currentIndex = selectedQuestions.findIndex(q => q.question === questionId);
+    if (currentIndex <= 0) return; // Already at top or not found
+
+    const newQuestions = [...selectedQuestions];
+    const temp = newQuestions[currentIndex];
+    newQuestions[currentIndex] = newQuestions[currentIndex - 1];
+    newQuestions[currentIndex - 1] = temp;
+
+    // Update order numbers
+    const reorderedQuestions = newQuestions.map((q, index) => ({
+      ...q,
+      order: index + 1
+    }));
+
+    setSelectedQuestions(reorderedQuestions);
+  };
+
+  const moveQuestionDown = (questionId: string) => {
+    const currentIndex = selectedQuestions.findIndex(q => q.question === questionId);
+    if (currentIndex >= selectedQuestions.length - 1 || currentIndex < 0) return; // Already at bottom or not found
+
+    const newQuestions = [...selectedQuestions];
+    const temp = newQuestions[currentIndex];
+    newQuestions[currentIndex] = newQuestions[currentIndex + 1];
+    newQuestions[currentIndex + 1] = temp;
+
+    // Update order numbers
+    const reorderedQuestions = newQuestions.map((q, index) => ({
+      ...q,
+      order: index + 1
+    }));
+
+    setSelectedQuestions(reorderedQuestions);
+  };
+
+  const handlePreviewQuestion = (question: Question) => {
+    setPreviewQuestion(question);
+    setIsPreviewOpen(true);
+  };
+
+  // Section management functions
+  const handleAddSection = () => {
+    if (!newSectionName.trim()) {
+      alert('Please enter a section name');
+      return;
+    }
+
+    if (sections.find(s => s.name.toLowerCase() === newSectionName.toLowerCase())) {
+      alert('Section with this name already exists');
+      return;
+    }
+
+    const newSection: TestSection = {
+      id: `section_${Date.now()}`,
+      name: newSectionName,
+      order: sections.length + 1
+    };
+
+    setSections([...sections, newSection]);
+    setNewSectionName('');
+    setIsAddingSectionMode(false);
+    setSelectedSectionForQuestion(newSection.id);
+  };
+
+  const handleRemoveSection = (sectionId: string) => {
+    if (sectionId === 'default') {
+      alert('Cannot remove the default section');
+      return;
+    }
+
+    // Check if section has questions
+    const questionsInSection = selectedQuestions.filter(q => q.section === sectionId);
+    if (questionsInSection.length > 0) {
+      const confirmMove = window.confirm(
+        `This section has ${questionsInSection.length} question(s). Move them to default section?`
+      );
+      
+      if (confirmMove) {
+        // Move questions to default section
+        const updatedQuestions = selectedQuestions.map(q => 
+          q.section === sectionId ? { ...q, section: 'default' } : q
+        );
+        setSelectedQuestions(updatedQuestions);
+      } else {
+        return;
+      }
+    }
+
+    setSections(sections.filter(s => s.id !== sectionId));
+    
+    // If current selected section is being removed, switch to default
+    if (selectedSectionForQuestion === sectionId) {
+      setSelectedSectionForQuestion('default');
+    }
+  };
+
+  const handleMoveQuestionToSection = (questionId: string, newSectionId: string) => {
+    const updatedQuestions = selectedQuestions.map(q =>
+      q.question === questionId ? { ...q, section: newSectionId } : q
+    );
+    setSelectedQuestions(updatedQuestions);
+  };
+
+  // Get API base URL for file uploads
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
+
+  // Helper function to render question text with inline attachments for preview
+  const renderQuestionTextWithAttachments = (questionText: string, attachments?: Array<{
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>) => {
+    if (!attachments || attachments.length === 0) {
+      return questionText;
+    }
+
+    // Check if question text contains attachment placeholders
+    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
+    const hasPlaceholders = placeholderRegex.test(questionText);
+
+    if (!hasPlaceholders) {
+      return questionText;
+    }
+
+    // Split text by placeholders and render inline
+    const parts: (string | React.ReactNode)[] = [];
+    let lastIndex = 0;
+    
+    const placeholderMatches = Array.from(questionText.matchAll(/\{\{attachment:(\d+)\}\}/g));
+    
+    for (const match of placeholderMatches) {
+      const matchIndex = match.index!;
+      const attachmentIndex = parseInt(match[1]);
+
+      // Add text before placeholder
+      if (matchIndex > lastIndex) {
+        parts.push(questionText.substring(lastIndex, matchIndex));
+      }
+
+      // Add attachment (without placeholder text)
+      if (attachmentIndex < attachments.length) {
+        parts.push(
+          <div key={`attachment-${attachmentIndex}`} className="my-4">
+            {renderAttachmentPreview(attachments[attachmentIndex], attachmentIndex)}
+          </div>
+        );
+      }
+
+      lastIndex = matchIndex + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < questionText.length) {
+      parts.push(questionText.substring(lastIndex));
+    }
+
+    return (
+      <div>
+        {parts.map((part, idx) => 
+          typeof part === 'string' ? <span key={idx}>{part}</span> : part
+        )}
+      </div>
+    );
+  };
+
+  const renderAttachmentPreview = (attachment: {
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }, idx: number) => {
+    return (
+      <div key={idx} className="inline-block w-full">
+        {attachment.fileType.startsWith('image/') ? (
+          <img 
+            src={`${FILE_BASE_URL}${attachment.fileUrl}`}
+            alt="Question attachment"
+            className="max-w-2xl rounded-lg border shadow-sm"
+          />
+        ) : (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 border rounded-lg max-w-md">
+            <span className="text-sm font-medium">{attachment.fileName}</span>
+            <span className="text-xs text-gray-600">({(attachment.fileSize / 1024).toFixed(1)} KB)</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const toggleStudent = (studentId: string) => {
@@ -254,8 +512,61 @@ const CreateTestPage = () => {
     return [];
   };
 
+  // Helper function to get available topics for selected chapters
+  const getAvailableTopics = (): string[] => {
+    if (!formData.subject) return [];
+    
+    const selectedSubject = subjects.find(s => s._id === formData.subject);
+    if (!selectedSubject || !selectedSubject.chapters) return [];
+
+    const topicsSet = new Set<string>();
+    
+    // If no chapters selected, get topics from all chapters
+    if (autoGenSettings.chapters.length === 0) {
+      selectedSubject.chapters.forEach(chapter => {
+        if (chapter.topics && Array.isArray(chapter.topics)) {
+          chapter.topics.forEach(topic => topicsSet.add(topic));
+        }
+      });
+    } else {
+      // Get topics only from selected chapters
+      selectedSubject.chapters.forEach(chapter => {
+        if (autoGenSettings.chapters.includes(chapter.name) && chapter.topics && Array.isArray(chapter.topics)) {
+          chapter.topics.forEach(topic => topicsSet.add(topic));
+        }
+      });
+    }
+    
+    return Array.from(topicsSet).sort();
+  };
+
+  // Helper function to get available question types
+  const getAvailableQuestionTypes = (): string[] => {
+    return ['multiple-choice', 'true-false', 'short-answer', 'long-answer'];
+  };
+
+  // Helper function to get common mark values
+  const getCommonMarkValues = (): number[] => {
+    return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25];
+  };
+
   const handleAutoGenerate = async () => {
     try {
+      // Validate difficulty percentages
+      const totalPercentage = Number(autoGenSettings.easyPercentage) + 
+                             Number(autoGenSettings.mediumPercentage) + 
+                             Number(autoGenSettings.hardPercentage);
+      
+      if (totalPercentage !== 100) {
+        alert(`Difficulty percentages must add up to 100%. Current total: ${totalPercentage}%`);
+        return;
+      }
+
+      if (Number(autoGenSettings.totalMarks) <= 0) {
+        alert('Total marks must be greater than 0');
+        return;
+      }
+
       setLoading(true);
       const response = await api.post('/tests/auto-generate', {
         subject: formData.subject,
@@ -265,7 +576,10 @@ const CreateTestPage = () => {
         easyPercentage: Number(autoGenSettings.easyPercentage),
         mediumPercentage: Number(autoGenSettings.mediumPercentage),
         hardPercentage: Number(autoGenSettings.hardPercentage),
-        chapters: autoGenSettings.chapters.length > 0 ? autoGenSettings.chapters : undefined
+        chapters: autoGenSettings.chapters.length > 0 ? autoGenSettings.chapters : undefined,
+        topics: autoGenSettings.topics.length > 0 ? autoGenSettings.topics : undefined,
+        questionTypes: autoGenSettings.questionTypes.length > 0 ? autoGenSettings.questionTypes : undefined,
+        specificMarks: autoGenSettings.specificMarks.length > 0 ? autoGenSettings.specificMarks : undefined
       });
 
       const generatedQuestions = response.data.questions;
@@ -284,11 +598,18 @@ const CreateTestPage = () => {
       });
       
       // Set selected questions
-      setSelectedQuestions(generatedQuestions.map((q: any) => ({
+      const newSelectedQuestions = generatedQuestions.map((q: any) => ({
         question: q.question._id,
         marks: q.marks,
-        order: q.order
-      })));
+        order: q.order,
+        section: selectedSectionForQuestion
+      }));
+      
+      console.log('Auto-generated questions:', newSelectedQuestions);
+      console.log('Current selected section:', selectedSectionForQuestion);
+      console.log('Available sections:', sections);
+      
+      setSelectedQuestions(newSelectedQuestions);
       
       alert(`Questions auto-generated successfully! ${generatedQuestions.length} questions selected.`);
       setMode('manual'); // Switch to manual mode to review
@@ -335,11 +656,14 @@ const CreateTestPage = () => {
         duration: Number(formData.duration),
         totalMarks,
         questions: selectedQuestions,
+        sections: sections,
         assignedTo: assignedStudents,
         assignedGroups: assignedGroups,
         scheduledDate: formData.scheduledDate || undefined,
         deadline: formData.deadline || undefined,
-        isPublished: publish
+        isPublished: publish,
+        showResultsImmediately: formData.showResultsImmediately,
+        resultsPublished: false
       };
 
       if (isEditMode) {
@@ -506,6 +830,27 @@ const CreateTestPage = () => {
                     rows={3}
                     placeholder="Instructions for students..."
                   />
+                </div>
+
+                <div className="col-span-2">
+                  <div className="flex items-center space-x-3 p-4 border rounded-lg bg-blue-50 border-blue-200">
+                    <input
+                      id="showResultsImmediately"
+                      type="checkbox"
+                      checked={formData.showResultsImmediately}
+                      onChange={(e) => setFormData({ ...formData, showResultsImmediately: e.target.checked })}
+                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor="showResultsImmediately" className="font-medium text-blue-900">
+                        Show Results Immediately After Submission
+                      </Label>
+                      <p className="text-sm text-blue-700 mt-1">
+                        When enabled, students can see their results immediately after submitting the test. 
+                        When disabled, results will only be visible after you manually publish them.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -770,6 +1115,170 @@ const CreateTestPage = () => {
                     )}
                   </div>
 
+                  {/* Topic Selection */}
+                  <div>
+                    <Label className="mb-2 block">Select Topics (Optional)</Label>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Select specific topics from the chosen chapters
+                    </p>
+                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-white p-3">
+                      {(() => {
+                        const availableTopics = getAvailableTopics();
+                        return availableTopics.length > 0 ? (
+                          <div className="space-y-2">
+                            {availableTopics.map((topic, index) => (
+                              <label
+                                key={index}
+                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={autoGenSettings.topics.includes(topic)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setAutoGenSettings({
+                                        ...autoGenSettings,
+                                        topics: [...autoGenSettings.topics, topic]
+                                      });
+                                    } else {
+                                      setAutoGenSettings({
+                                        ...autoGenSettings,
+                                        topics: autoGenSettings.topics.filter(t => t !== topic)
+                                      });
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300"
+                                />
+                                <span className="text-sm">{topic}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 text-center py-2">
+                            {formData.subject ? 'No topics available for selected chapters' : 'Please select a subject and chapters first'}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                    {autoGenSettings.topics.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs text-gray-600">
+                          {autoGenSettings.topics.length} topic(s) selected
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAutoGenSettings({ ...autoGenSettings, topics: [] })}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Question Type Selection */}
+                  <div>
+                    <Label className="mb-2 block">Select Question Types (Optional)</Label>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Choose specific question types to include
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 border rounded-lg bg-white p-3">
+                      {getAvailableQuestionTypes().map((type, index) => (
+                        <label
+                          key={index}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={autoGenSettings.questionTypes.includes(type)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAutoGenSettings({
+                                  ...autoGenSettings,
+                                  questionTypes: [...autoGenSettings.questionTypes, type]
+                                });
+                              } else {
+                                setAutoGenSettings({
+                                  ...autoGenSettings,
+                                  questionTypes: autoGenSettings.questionTypes.filter(qt => qt !== type)
+                                });
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <span className="text-sm capitalize">{type.replace('-', ' ')}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {autoGenSettings.questionTypes.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs text-gray-600">
+                          {autoGenSettings.questionTypes.length} question type(s) selected
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAutoGenSettings({ ...autoGenSettings, questionTypes: [] })}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Specific Marks Selection */}
+                  <div>
+                    <Label className="mb-2 block">Select Specific Mark Values (Optional)</Label>
+                    <p className="text-xs text-gray-600 mb-2">
+                      Choose specific mark values for questions (leave empty for any marks)
+                    </p>
+                    <div className="grid grid-cols-6 gap-2 border rounded-lg bg-white p-3">
+                      {getCommonMarkValues().map((marks, index) => (
+                        <label
+                          key={index}
+                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={autoGenSettings.specificMarks.includes(marks)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAutoGenSettings({
+                                  ...autoGenSettings,
+                                  specificMarks: [...autoGenSettings.specificMarks, marks].sort((a, b) => a - b)
+                                });
+                              } else {
+                                setAutoGenSettings({
+                                  ...autoGenSettings,
+                                  specificMarks: autoGenSettings.specificMarks.filter(m => m !== marks)
+                                });
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <span className="text-sm">{marks}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {autoGenSettings.specificMarks.length > 0 && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs text-gray-600">
+                          {autoGenSettings.specificMarks.length} mark value(s) selected: {autoGenSettings.specificMarks.join(', ')}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAutoGenSettings({ ...autoGenSettings, specificMarks: [] })}
+                        >
+                          Clear All
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Difficulty Distribution */}
                   <div className="grid grid-cols-4 gap-4">
                     <div>
@@ -816,6 +1325,48 @@ const CreateTestPage = () => {
                       />
                     </div>
                   </div>
+
+                  {/* Selection Summary */}
+                  {(autoGenSettings.chapters.length > 0 || 
+                    autoGenSettings.topics.length > 0 || 
+                    autoGenSettings.questionTypes.length > 0 || 
+                    autoGenSettings.specificMarks.length > 0) && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <h4 className="text-sm font-medium text-blue-800 mb-2">Selection Summary</h4>
+                      <div className="space-y-1 text-xs text-blue-700">
+                        {autoGenSettings.chapters.length > 0 && (
+                          <p><span className="font-medium">Chapters:</span> {autoGenSettings.chapters.join(', ')}</p>
+                        )}
+                        {autoGenSettings.topics.length > 0 && (
+                          <p><span className="font-medium">Topics:</span> {autoGenSettings.topics.join(', ')}</p>
+                        )}
+                        {autoGenSettings.questionTypes.length > 0 && (
+                          <p><span className="font-medium">Question Types:</span> {autoGenSettings.questionTypes.map(qt => qt.replace('-', ' ')).join(', ')}</p>
+                        )}
+                        {autoGenSettings.specificMarks.length > 0 && (
+                          <p><span className="font-medium">Mark Values:</span> {autoGenSettings.specificMarks.join(', ')}</p>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setAutoGenSettings({
+                            ...autoGenSettings,
+                            chapters: [],
+                            topics: [],
+                            questionTypes: [],
+                            specificMarks: []
+                          })}
+                          className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                        >
+                          Clear All Filters
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <Button
                     type="button"
                     onClick={handleAutoGenerate}
@@ -831,51 +1382,128 @@ const CreateTestPage = () => {
               {mode === 'manual' && (
                 <div className="space-y-4">
                   {/* Filters */}
-                  <div className="grid grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <Input
-                        placeholder="Search questions..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <select
-                        value={filters.chapter}
-                        onChange={(e) => setFilters({ ...filters, chapter: e.target.value })}
-                        className="flex h-10 w-full rounded-md border px-3 py-2"
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                    {/* Search and basic filters */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <Label htmlFor="search">Search Questions</Label>
+                        <Input
+                          id="search"
+                          placeholder="Search questions..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="chapter-filter">Chapter</Label>
+                        <select
+                          id="chapter-filter"
+                          value={filters.chapter}
+                          onChange={(e) => setFilters({ ...filters, chapter: e.target.value })}
+                          className="flex h-10 w-full rounded-md border px-3 py-2"
+                          disabled={!formData.subject}
+                        >
+                          <option value="">All Chapters</option>
+                          {subjects
+                            .find(s => s._id === formData.subject)
+                            ?.chapters.map((chapter, index) => (
+                              <option key={index} value={chapter.name}>
+                                {chapter.name}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="difficulty-filter">Difficulty</Label>
+                        <select
+                          id="difficulty-filter"
+                          value={filters.difficulty}
+                          onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
+                          className="flex h-10 w-full rounded-md border px-3 py-2"
+                        >
+                          <option value="">All Difficulties</option>
+                          <option value="easy">Easy</option>
+                          <option value="medium">Medium</option>
+                          <option value="hard">Hard</option>
+                        </select>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={fetchQuestions}
                         disabled={!formData.subject}
+                        className="mt-6"
                       >
-                        <option value="">All Chapters</option>
-                        {subjects
-                          .find(s => s._id === formData.subject)
-                          ?.chapters.map((chapter, index) => (
-                            <option key={index} value={chapter.name}>
-                              {chapter.name}
-                            </option>
-                          ))}
-                      </select>
+                        <Search className="h-4 w-4 mr-2" />
+                        Search
+                      </Button>
                     </div>
-                    <div>
-                      <select
-                        value={filters.difficulty}
-                        onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
-                        className="flex h-10 w-full rounded-md border px-3 py-2"
+
+                    {/* Marks filter */}
+                    <div className="flex items-end gap-4">
+                      <div className="flex-1">
+                        <Label htmlFor="min-marks">Minimum Marks</Label>
+                        <Input
+                          id="min-marks"
+                          type="number"
+                          placeholder="e.g., 1"
+                          value={filters.minMarks}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Ensure minimum is not greater than maximum
+                            if (filters.maxMarks && value && parseInt(value) > parseInt(filters.maxMarks)) {
+                              return;
+                            }
+                            setFilters({ ...filters, minMarks: value });
+                          }}
+                          min="1"
+                          className={filters.maxMarks && filters.minMarks && parseInt(filters.minMarks) > parseInt(filters.maxMarks) ? 'border-red-500' : ''}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <Label htmlFor="max-marks">Maximum Marks</Label>
+                        <Input
+                          id="max-marks"
+                          type="number"
+                          placeholder="e.g., 10"
+                          value={filters.maxMarks}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Ensure maximum is not less than minimum
+                            if (filters.minMarks && value && parseInt(value) < parseInt(filters.minMarks)) {
+                              return;
+                            }
+                            setFilters({ ...filters, maxMarks: value });
+                          }}
+                          min="1"
+                          className={filters.maxMarks && filters.minMarks && parseInt(filters.maxMarks) < parseInt(filters.minMarks) ? 'border-red-500' : ''}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setFilters({ 
+                          ...filters, 
+                          chapter: '', 
+                          difficulty: '', 
+                          minMarks: '', 
+                          maxMarks: '' 
+                        })}
                       >
-                        <option value="">All Difficulties</option>
-                        <option value="easy">Easy</option>
-                        <option value="medium">Medium</option>
-                        <option value="hard">Hard</option>
-                      </select>
+                        Clear Filters
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      onClick={fetchQuestions}
-                      disabled={!formData.subject}
-                    >
-                      <Search className="h-4 w-4 mr-2" />
-                      Search
-                    </Button>
+                    
+                    {/* Filter status message */}
+                    {(filters.minMarks || filters.maxMarks) && (
+                      <div className="mt-2 text-sm text-blue-600">
+                        {filters.minMarks && filters.maxMarks 
+                          ? `Showing questions with ${filters.minMarks}-${filters.maxMarks} marks`
+                          : filters.minMarks 
+                          ? `Showing questions with ${filters.minMarks}+ marks`
+                          : `Showing questions with up to ${filters.maxMarks} marks`
+                        }
+                      </div>
+                    )}
                   </div>
 
                   {/* Available Questions */}
@@ -889,13 +1517,14 @@ const CreateTestPage = () => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Chapter</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Difficulty</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Marks</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Action</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">View</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Action</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {questions.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-4 text-center text-gray-500">
+                              <td colSpan={7} className="px-4 py-4 text-center text-gray-500">
                                 No questions available. Please adjust filters or add questions to the bank.
                               </td>
                             </tr>
@@ -919,7 +1548,19 @@ const CreateTestPage = () => {
                                   </span>
                                 </td>
                                 <td className="px-4 py-3">{q.marks}</td>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 text-center">
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handlePreviewQuestion(q)}
+                                    className="text-blue-600 hover:bg-blue-50"
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" />
+                                    View
+                                  </Button>
+                                </td>
+                                <td className="px-4 py-3 text-center">
                                   <Button
                                     type="button"
                                     size="sm"
@@ -942,12 +1583,117 @@ const CreateTestPage = () => {
 
               {/* Selected Questions */}
               <div className="mt-6">
+                {/* Section Management */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold">Test Sections</h3>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsAddingSectionMode(!isAddingSectionMode)}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Section
+                    </Button>
+                  </div>
+
+                  {/* Add Section Form */}
+                  {isAddingSectionMode && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Enter section name (e.g., Section B, Part II)"
+                          value={newSectionName}
+                          onChange={(e) => setNewSectionName(e.target.value)}
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddSection();
+                            if (e.key === 'Escape') {
+                              setIsAddingSectionMode(false);
+                              setNewSectionName('');
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddSection}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Add
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setIsAddingSectionMode(false);
+                            setNewSectionName('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sections List */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {sections.map((section) => (
+                      <div key={section.id} className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={selectedSectionForQuestion === section.id ? 'default' : 'outline'}
+                          onClick={() => setSelectedSectionForQuestion(section.id)}
+                          className={`${
+                            selectedSectionForQuestion === section.id
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                              : 'hover:bg-blue-50'
+                          }`}
+                        >
+                          {section.name}
+                          {selectedQuestions.filter(q => q.section === section.id).length > 0 && (
+                            <span className="ml-2 text-xs bg-white text-blue-600 px-1.5 py-0.5 rounded-full">
+                              {selectedQuestions.filter(q => q.section === section.id).length}
+                            </span>
+                          )}
+                        </Button>
+                        {section.id !== 'default' && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemoveSection(section.id)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-xs text-gray-600 mb-4">
+                    Questions will be added to <strong>{sections.find(s => s.id === selectedSectionForQuestion)?.name}</strong>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">
                     Selected Questions ({selectedQuestions.length})
                   </h3>
-                  <div className="text-sm">
-                    Total Marks: <span className="font-bold text-blue-600">{getTotalMarks()}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm">
+                      Total Marks: <span className="font-bold text-blue-600">{getTotalMarks()}</span>
+                    </div>
+                    {selectedQuestions.length > 0 && (
+                      <div className="text-xs text-gray-600">
+                        Use ↑↓ buttons to reorder questions
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -956,47 +1702,223 @@ const CreateTestPage = () => {
                     No questions selected yet
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {selectedQuestions.map((sq) => {
-                      const question = getQuestionDetails(sq.question);
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {sections
+                      .filter(section => selectedQuestions.some(q => q.section === section.id))
+                      .sort((a, b) => a.order - b.order)
+                      .map((section) => {
+                        const sectionQuestions = selectedQuestions
+                          .filter(q => q.section === section.id)
+                          .sort((a, b) => a.order - b.order);
+
+                        return (
+                          <div key={section.id} className="border rounded-lg p-3 bg-white">
+                            <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                              <h4 className="font-medium text-gray-900">{section.name}</h4>
+                              <span className="text-sm text-gray-500">
+                                {sectionQuestions.length} question{sectionQuestions.length !== 1 ? 's' : ''} • 
+                                {sectionQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
+                              </span>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              {sectionQuestions.map((sq, index) => {
+                                const question = getQuestionDetails(sq.question);
+                                const isFirst = index === 0;
+                                const isLast = index === sectionQuestions.length - 1;
+                                
+                                return (
+                                  <div
+                                    key={sq.question}
+                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:border-gray-300 transition-colors"
+                                  >
+                                    {/* Question Order and Reorder Controls */}
+                                    <div className="flex flex-col items-center">
+                                      <span className="font-medium text-gray-700 mb-1">#{sq.order}</span>
+                                      <div className="flex flex-col gap-1">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => moveQuestionUp(sq.question)}
+                                          disabled={isFirst}
+                                          className="h-6 w-6 p-0 hover:bg-blue-100 disabled:opacity-30"
+                                          title="Move up"
+                                        >
+                                          <ChevronUp className="h-3 w-3" />
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => moveQuestionDown(sq.question)}
+                                          disabled={isLast}
+                                          className="h-6 w-6 p-0 hover:bg-blue-100 disabled:opacity-30"
+                                          title="Move down"
+                                        >
+                                          <ChevronDown className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Question Content */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium truncate">
+                                        {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
+                                      </p>
+                                      <div className="flex items-center gap-4 mt-1">
+                                        <p className="text-xs text-gray-600">
+                                          Chapter: {question?.chapter || 'N/A'}
+                                        </p>
+                                        <p className="text-xs text-gray-600">
+                                          Difficulty: <span className={`inline-block px-1 py-0.5 rounded text-xs ${
+                                            question?.difficultyLevel === 'easy'
+                                              ? 'bg-green-100 text-green-800'
+                                              : question?.difficultyLevel === 'medium'
+                                              ? 'bg-yellow-100 text-yellow-800'
+                                              : 'bg-red-100 text-red-800'
+                                          }`}>
+                                            {question?.difficultyLevel || 'N/A'}
+                                          </span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Section Selector and Action Buttons */}
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1">
+                                        <Label className="text-xs whitespace-nowrap">Section:</Label>
+                                        <select
+                                          value={sq.section || 'default'}
+                                          onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
+                                          className="text-xs border rounded px-2 py-1 bg-white"
+                                        >
+                                          {sections.map((sec) => (
+                                            <option key={sec.id} value={sec.id}>
+                                              {sec.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <Label className="text-xs whitespace-nowrap">Marks:</Label>
+                                        <Input
+                                          type="number"
+                                          value={sq.marks}
+                                          onChange={(e) =>
+                                            handleUpdateMarks(sq.question, Number(e.target.value))
+                                          }
+                                          className="w-16 h-8"
+                                          min="1"
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => question && handlePreviewQuestion(question)}
+                                        className="text-blue-600 hover:bg-blue-50"
+                                        title="View full question"
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleRemoveQuestion(sq.question)}
+                                        className="text-red-600 hover:bg-red-50"
+                                        title="Remove question"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    
+                    {/* Display orphaned questions (questions without valid sections) */}
+                    {(() => {
+                      const orphanedQuestions = selectedQuestions.filter(q => 
+                        !sections.some(section => section.id === q.section)
+                      );
+                      
+                      if (orphanedQuestions.length === 0) return null;
+                      
                       return (
-                        <div
-                          key={sq.question}
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                        >
-                          <span className="font-medium text-gray-700">#{sq.order}</span>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">
-                              {question?.questionText ? (question.questionText.substring(0, 60) + (question.questionText.length > 60 ? '...' : '')) : 'Question'}
-                            </p>
-                            <p className="text-xs text-gray-600 truncate">
-                              {question?.questionText || sq.question}
-                            </p>
+                        <div className="border rounded-lg p-3 bg-yellow-50 border-yellow-200">
+                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-yellow-200">
+                            <h4 className="font-medium text-gray-900">
+                              ⚠️ Questions without section
+                            </h4>
+                            <span className="text-sm text-gray-500">
+                              {orphanedQuestions.length} question{orphanedQuestions.length !== 1 ? 's' : ''}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">Marks:</Label>
-                            <Input
-                              type="number"
-                              value={sq.marks}
-                              onChange={(e) =>
-                                handleUpdateMarks(sq.question, Number(e.target.value))
-                              }
-                              className="w-16 h-8"
-                              min="1"
-                            />
+                          <div className="text-xs text-yellow-700 mb-2">
+                            These questions need to be assigned to a section
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRemoveQuestion(sq.question)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          
+                          <div className="space-y-2">
+                            {orphanedQuestions.map((sq) => {
+                              const question = getQuestionDetails(sq.question);
+                              
+                              return (
+                                <div
+                                  key={sq.question}
+                                  className="flex items-center gap-3 p-3 bg-yellow-100 rounded-lg border border-yellow-200"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">
+                                      {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
+                                    </p>
+                                    <div className="flex items-center gap-4 mt-1">
+                                      <p className="text-xs text-gray-600">
+                                        Chapter: {question?.chapter || 'N/A'}
+                                      </p>
+                                      <p className="text-xs text-gray-600">
+                                        Marks: {sq.marks}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                      <Label className="text-xs whitespace-nowrap">Assign to:</Label>
+                                      <select
+                                        value={sq.section || 'default'}
+                                        onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
+                                        className="text-xs border rounded px-2 py-1 bg-white"
+                                      >
+                                        {sections.map((sec) => (
+                                          <option key={sec.id} value={sec.id}>
+                                            {sec.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleRemoveQuestion(sq.question)}
+                                      className="h-6 w-6 p-0 hover:bg-red-100 text-red-600"
+                                      title="Remove question"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
                 )}
               </div>
@@ -1026,6 +1948,124 @@ const CreateTestPage = () => {
           </>
         )}
       </form>
+
+      {/* Question Preview Modal */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Question Preview</DialogTitle>
+          </DialogHeader>
+          
+          {previewQuestion && (
+            <div className="space-y-4">
+              {/* Question Header Info */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Chapter:</span>
+                  <p className="text-sm">{previewQuestion.chapter}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Topic:</span>
+                  <p className="text-sm">{previewQuestion.topic || 'N/A'}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Marks:</span>
+                  <p className="text-sm font-semibold">{previewQuestion.marks}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Difficulty:</span>
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                    previewQuestion.difficultyLevel === 'easy'
+                      ? 'bg-green-100 text-green-800'
+                      : previewQuestion.difficultyLevel === 'medium'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {previewQuestion.difficultyLevel}
+                  </span>
+                </div>
+              </div>
+
+              {/* Question Text */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Question:</h3>
+                <div className="p-4 border rounded-lg bg-white">
+                  <div className="text-gray-800 whitespace-pre-wrap">
+                    {renderQuestionTextWithAttachments(previewQuestion.questionText, previewQuestion.attachments)}
+                  </div>
+                  
+                  {/* Question Image */}
+                  {previewQuestion.questionImage && (
+                    <div className="mt-4">
+                      <img 
+                        src={previewQuestion.questionImage} 
+                        alt="Question attachment"
+                        className="max-w-full h-auto rounded border"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Options (for multiple choice questions) */}
+              {previewQuestion.options && previewQuestion.options.length > 0 && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Options:</h3>
+                  <div className="space-y-2">
+                    {previewQuestion.options.map((option, index) => (
+                      <div 
+                        key={index} 
+                        className={`p-3 border rounded-lg ${
+                          previewQuestion.correctAnswer === option 
+                            ? 'bg-green-50 border-green-200' 
+                            : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-gray-600">
+                            {String.fromCharCode(65 + index)}.
+                          </span>
+                          <div className={previewQuestion.correctAnswer === option ? 'font-medium text-green-800' : ''}>
+                            {renderQuestionTextWithAttachments(option, previewQuestion.attachments)}
+                          </div>
+                          {previewQuestion.correctAnswer === option && (
+                            <span className="ml-auto text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
+                              Correct Answer
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Answer (for non-multiple choice questions) */}
+              {previewQuestion.correctAnswer && (!previewQuestion.options || previewQuestion.options.length === 0) && (
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Answer:</h3>
+                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
+                    <div className="text-gray-800 whitespace-pre-wrap">
+                      {renderQuestionTextWithAttachments(
+                        previewQuestion.correctAnswer, 
+                        previewQuestion.correctAnswerAttachments || previewQuestion.attachments
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Question Type */}
+              {previewQuestion.questionType && (
+                <div className="text-sm text-gray-600 pt-4 border-t">
+                  <span className="font-medium">Question Type: </span>
+                  <span className="capitalize">{previewQuestion.questionType.replace('-', ' ')}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

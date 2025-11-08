@@ -43,6 +43,8 @@ export interface IQuestion extends Document {
     fileSize: number;
   }>;
   correctAnswerAttachmentPosition?: AttachmentPosition;
+  answerLines?: number;
+  tags?: string[];
   subject: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -135,6 +137,16 @@ const questionSchema = new Schema<IQuestion>(
       enum: Object.values(AttachmentPosition),
       default: AttachmentPosition.AFTER
     },
+    answerLines: {
+      type: Number,
+      default: 3,
+      min: 1,
+      max: 20
+    },
+    tags: [{
+      type: String,
+      trim: true
+    }],
     subject: {
       type: Schema.Types.ObjectId,
       ref: 'Subject',

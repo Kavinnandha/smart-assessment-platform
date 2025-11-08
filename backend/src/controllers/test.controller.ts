@@ -45,7 +45,19 @@ export const createTest = async (req: AuthRequest, res: Response) => {
 
 export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
   try {
-    const { subject, totalMarks, easyPercentage, mediumPercentage, hardPercentage, topics, title, duration, chapters } = req.body;
+    const { 
+      subject, 
+      totalMarks, 
+      easyPercentage, 
+      mediumPercentage, 
+      hardPercentage, 
+      topics, 
+      title, 
+      duration, 
+      chapters, 
+      questionTypes, 
+      specificMarks 
+    } = req.body;
 
     // Calculate marks distribution
     const easyMarks = Math.floor(totalMarks * (easyPercentage / 100));
@@ -60,6 +72,12 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
     if (chapters && chapters.length > 0) {
       filter.chapter = { $in: chapters };
     }
+    if (questionTypes && questionTypes.length > 0) {
+      filter.questionType = { $in: questionTypes };
+    }
+    if (specificMarks && specificMarks.length > 0) {
+      filter.marks = { $in: specificMarks };
+    }
 
     // Fetch questions by difficulty
     const easyQuestions = await Question.find({ ...filter, difficultyLevel: DifficultyLevel.EASY });
@@ -69,8 +87,22 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
     // Check if any questions are available
     const totalAvailableQuestions = easyQuestions.length + mediumQuestions.length + hardQuestions.length;
     if (totalAvailableQuestions === 0) {
-      const message = chapters && chapters.length > 0 
-        ? `No questions found in the selected chapter${chapters.length > 1 ? 's' : ''}: ${chapters.join(', ')}`
+      const filterCriteria = [];
+      if (chapters && chapters.length > 0) {
+        filterCriteria.push(`chapter${chapters.length > 1 ? 's' : ''}: ${chapters.join(', ')}`);
+      }
+      if (topics && topics.length > 0) {
+        filterCriteria.push(`topic${topics.length > 1 ? 's' : ''}: ${topics.join(', ')}`);
+      }
+      if (questionTypes && questionTypes.length > 0) {
+        filterCriteria.push(`question type${questionTypes.length > 1 ? 's' : ''}: ${questionTypes.join(', ')}`);
+      }
+      if (specificMarks && specificMarks.length > 0) {
+        filterCriteria.push(`mark value${specificMarks.length > 1 ? 's' : ''}: ${specificMarks.join(', ')}`);
+      }
+      
+      const message = filterCriteria.length > 0
+        ? `No questions found matching the selected criteria: ${filterCriteria.join(', ')}`
         : 'No questions found for the selected subject';
       return res.status(404).json({ message });
     }
@@ -108,9 +140,25 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
 
     // Check if we were able to select any questions
     if (selectedQuestions.length === 0) {
-      const message = chapters && chapters.length > 0
-        ? `No suitable questions found in the selected chapter${chapters.length > 1 ? 's' : ''} matching the criteria. Try adjusting the difficulty percentages or total marks.`
-        : 'No suitable questions found matching the criteria. Try adjusting the difficulty percentages or total marks.';
+      const filterCriteria = [];
+      if (chapters && chapters.length > 0) {
+        filterCriteria.push(`chapter${chapters.length > 1 ? 's' : ''}: ${chapters.join(', ')}`);
+      }
+      if (topics && topics.length > 0) {
+        filterCriteria.push(`topic${topics.length > 1 ? 's' : ''}: ${topics.join(', ')}`);
+      }
+      if (questionTypes && questionTypes.length > 0) {
+        filterCriteria.push(`question type${questionTypes.length > 1 ? 's' : ''}: ${questionTypes.join(', ')}`);
+      }
+      if (specificMarks && specificMarks.length > 0) {
+        filterCriteria.push(`mark value${specificMarks.length > 1 ? 's' : ''}: ${specificMarks.join(', ')}`);
+      }
+      
+      const criteriaText = filterCriteria.length > 0 
+        ? ` with the selected criteria (${filterCriteria.join(', ')})`
+        : '';
+      
+      const message = `No suitable questions found${criteriaText} matching the difficulty distribution and total marks. Try adjusting the difficulty percentages, total marks, or selection criteria.`;
       return res.status(404).json({ message });
     }
 
@@ -318,6 +366,64 @@ export const unpublishTest = async (req: AuthRequest, res: Response) => {
     res.json({ message: 'Test unpublished successfully', test });
   } catch (error) {
     console.error('Unpublish test error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const publishResults = async (req: AuthRequest, res: Response) => {
+  try {
+    const test = await Test.findById(req.params.id);
+
+    if (!test) {
+      return res.status(404).json({ message: 'Test not found' });
+    }
+
+    // Check if user is authorized (teacher who created the test or admin)
+    if (test.createdBy.toString() !== req.user?.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to publish results for this test' });
+    }
+
+    // Update test to mark results as published
+    const updatedTest = await Test.findByIdAndUpdate(
+      req.params.id,
+      { resultsPublished: true },
+      { new: true }
+    )
+      .populate('subject', 'name')
+      .populate('createdBy', 'name email');
+
+    res.json({ message: 'Results published successfully. Students can now view their results.', test: updatedTest });
+  } catch (error) {
+    console.error('Publish results error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const unpublishResults = async (req: AuthRequest, res: Response) => {
+  try {
+    const test = await Test.findById(req.params.id);
+
+    if (!test) {
+      return res.status(404).json({ message: 'Test not found' });
+    }
+
+    // Check if user is authorized (teacher who created the test or admin)
+    if (test.createdBy.toString() !== req.user?.userId && req.user?.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to unpublish results for this test' });
+    }
+
+    // Update test to mark results as unpublished
+    const updatedTest = await Test.findByIdAndUpdate(
+      req.params.id,
+      { resultsPublished: false },
+      { new: true }
+    )
+      .populate('subject', 'name')
+      .populate('createdBy', 'name email');
+
+    res.json({ message: 'Results hidden from students successfully.', test: updatedTest });
+  } catch (error) {
+    console.error('Unpublish results error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

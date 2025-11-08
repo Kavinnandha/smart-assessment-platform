@@ -48,9 +48,21 @@ const CreateQuestionPage = () => {
     questionType: 'short-answer',
     correctAnswer: '',
     attachmentPosition: 'after',
-    correctAnswerAttachmentPosition: 'after'
+    correctAnswerAttachmentPosition: 'after',
+    answerLines: '3',
+    tags: ''
   });
+  const [tagsList, setTagsList] = useState<string[]>([]);
   const [options, setOptions] = useState<string[]>(['', '', '', '']); // For MCQ and True/False
+
+  // Common tags for quick selection
+  const commonTags = [
+    'algebra', 'geometry', 'calculus', 'statistics', 'probability',
+    'physics', 'chemistry', 'biology', 'history', 'literature',
+    'grammar', 'vocabulary', 'essay', 'comprehension', 'analysis',
+    'problem-solving', 'critical-thinking', 'basic', 'intermediate', 'advanced',
+    'formula', 'theorem', 'definition', 'example', 'application'
+  ];
 
   useEffect(() => {
     fetchSubjects();
@@ -101,8 +113,15 @@ const CreateQuestionPage = () => {
         questionType: question.questionType || 'short-answer',
         correctAnswer: question.correctAnswer || '',
         attachmentPosition: question.attachmentPosition || 'after',
-        correctAnswerAttachmentPosition: question.correctAnswerAttachmentPosition || 'after'
+        correctAnswerAttachmentPosition: question.correctAnswerAttachmentPosition || 'after',
+        answerLines: question.answerLines?.toString() || '3',
+        tags: question.tags ? question.tags.join(', ') : ''
       });
+
+      // Set tags list
+      if (question.tags && question.tags.length > 0) {
+        setTagsList(question.tags);
+      }
 
       // Load options for MCQ/True-False
       if (question.options && question.options.length > 0) {
@@ -155,6 +174,12 @@ const CreateQuestionPage = () => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
+    // Update tags list when tags field changes
+    if (name === 'tags') {
+      const tagsArray = value.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+      setTagsList(tagsArray);
+    }
+
     // Reset topic when chapter changes
     if (name === 'chapter') {
       setFormData(prev => ({ ...prev, chapter: value, topic: '' }));
@@ -170,6 +195,20 @@ const CreateQuestionPage = () => {
         setOptions([]);
       }
     }
+  };
+
+  const handleAddTag = (tag: string) => {
+    if (tag && !tagsList.includes(tag)) {
+      const newTagsList = [...tagsList, tag];
+      setTagsList(newTagsList);
+      setFormData({ ...formData, tags: newTagsList.join(', ') });
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    const newTagsList = tagsList.filter(tag => tag !== tagToRemove);
+    setTagsList(newTagsList);
+    setFormData({ ...formData, tags: newTagsList.join(', ') });
   };
 
   const handleOptionChange = (index: number, value: string) => {
@@ -318,10 +357,6 @@ const CreateQuestionPage = () => {
     }
   };
 
-  const getAnswerAttachmentPlaceholderPreview = () => {
-    const placeholderRegex = /\{\{answerAttachment:(\d+)\}\}/g;
-    return formData.correctAnswer.match(placeholderRegex) || [];
-  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
@@ -344,6 +379,8 @@ const CreateQuestionPage = () => {
       const payload = {
         ...formData,
         marks: Number(formData.marks),
+        answerLines: Number(formData.answerLines),
+        tags: tagsList,
         attachments: attachments,
         correctAnswerAttachments: correctAnswerAttachments,
         options: (formData.questionType === 'multiple-choice' || formData.questionType === 'true-false') ? options : undefined,
@@ -510,9 +547,70 @@ const CreateQuestionPage = () => {
             )}
           </div>
           
+          <div>
+            <Label htmlFor="tags">Tags (Optional)</Label>
+            <Input
+              id="tags"
+              name="tags"
+              type="text"
+              value={formData.tags}
+              onChange={handleChange}
+              placeholder="Enter tags separated by commas (e.g., algebra, equations, quadratic)"
+              className="mb-2"
+            />
+            <p className="text-xs text-gray-500 mb-2">
+              Add tags to categorize and search questions easily
+            </p>
+            
+            {/* Common Tags Quick Selection */}
+            <div className="mb-3">
+              <p className="text-xs text-gray-600 mb-1">Quick select common tags:</p>
+              <div className="flex flex-wrap gap-1">
+                {commonTags.slice(0, 10).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => handleAddTag(tag)}
+                    disabled={tagsList.includes(tag)}
+                    className={`px-2 py-1 text-xs rounded border ${
+                      tagsList.includes(tag)
+                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-300'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Display selected tags */}
+            {tagsList.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-600 mb-1">Selected tags:</p>
+                <div className="flex flex-wrap gap-2">
+                  {tagsList.map((tag, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="ml-1 text-blue-600 hover:text-blue-800"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div>
             <Label htmlFor="marks">Marks *</Label>
             <Input
@@ -524,6 +622,22 @@ const CreateQuestionPage = () => {
               required
               min="1"
             />
+          </div>
+          <div>
+            <Label htmlFor="answerLines">Answer Lines for Export</Label>
+            <Input
+              id="answerLines"
+              name="answerLines"
+              type="number"
+              value={formData.answerLines}
+              onChange={handleChange}
+              min="1"
+              max="20"
+              placeholder="3"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Number of lines for answer space when exporting questions
+            </p>
           </div>
           <div>
             <Label htmlFor="difficultyLevel">Difficulty Level *</Label>

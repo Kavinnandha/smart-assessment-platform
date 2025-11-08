@@ -72,6 +72,7 @@ interface Submission {
     name: string;
   };
   evaluatedAt?: string;
+  resultsRestricted?: boolean;
 }
 
 const EvaluatePage = () => {
@@ -100,7 +101,17 @@ const EvaluatePage = () => {
       const fetchedSubmission = response.data.submission;
       console.log('Fetched submission:', fetchedSubmission);
       console.log('Test questions:', fetchedSubmission.test?.questions);
-      setSubmission(fetchedSubmission);
+      
+      // Check if results are available (if answers array is empty and it's a student viewing)
+      if (isStudent && fetchedSubmission.answers.length === 0 && fetchedSubmission.test?.questions?.length > 0) {
+        // Results are not yet available for students
+        setSubmission({
+          ...fetchedSubmission,
+          resultsRestricted: true
+        });
+      } else {
+        setSubmission(fetchedSubmission);
+      }
       
       // Initialize evaluated answers with existing data or defaults
       const initialAnswers = fetchedSubmission.answers.map((ans: Answer) => ({
@@ -352,6 +363,63 @@ const EvaluatePage = () => {
         <div className="bg-white p-6 rounded-lg shadow text-center">
           <p className="text-red-600">Submission not found</p>
           <Button onClick={() => navigate('/tests')} className="mt-4">
+            Back to Tests
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (submission.resultsRestricted) {
+    return (
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/tests')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Tests
+          </Button>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="mb-4">
+            <Clock className="h-16 w-16 mx-auto text-orange-500 mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Results Pending Publication</h2>
+            <p className="text-gray-600 mb-4">
+              Your test has been submitted successfully! However, the results are not yet available for viewing.
+            </p>
+            <p className="text-gray-600 mb-6">
+              Your teacher needs to publish the results before you can see your score and evaluation.
+            </p>
+          </div>
+          
+          <div className="bg-blue-50 p-4 rounded-lg mb-6">
+            <h3 className="font-semibold text-blue-900 mb-2">Test Information</h3>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Test:</span>
+                <span className="font-medium ml-2">{submission.test.title}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Subject:</span>
+                <span className="font-medium ml-2">{submission.test.subject.name}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Submitted At:</span>
+                <span className="font-medium ml-2">{new Date(submission.submittedAt).toLocaleString()}</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Status:</span>
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs ml-2">
+                  Awaiting Result Publication
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <Button onClick={() => navigate('/tests')} className="bg-blue-600 hover:bg-blue-700">
             Back to Tests
           </Button>
         </div>

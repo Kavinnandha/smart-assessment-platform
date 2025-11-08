@@ -4,6 +4,14 @@ export interface ITestQuestion {
   question: mongoose.Types.ObjectId;
   marks: number;
   order: number;
+  section?: string;
+}
+
+export interface ITestSection {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
 }
 
 export interface ITest extends Document {
@@ -13,12 +21,15 @@ export interface ITest extends Document {
   duration: number; // in minutes
   totalMarks: number;
   questions: ITestQuestion[];
+  sections?: ITestSection[];
   createdBy: mongoose.Types.ObjectId;
   assignedTo: mongoose.Types.ObjectId[]; // Student IDs (for individual assignment)
   assignedGroups: mongoose.Types.ObjectId[]; // Group IDs (for group assignment)
   scheduledDate?: Date;
   deadline?: Date;
   isPublished: boolean;
+  resultsPublished: boolean; // New field to control result visibility
+  showResultsImmediately: boolean; // New field to control when results are shown
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +71,27 @@ const testSchema = new Schema<ITest>(
       order: {
         type: Number,
         required: true
+      },
+      section: {
+        type: String,
+        default: 'default'
+      }
+    }],
+    sections: [{
+      id: {
+        type: String,
+        required: true
+      },
+      name: {
+        type: String,
+        required: true
+      },
+      description: {
+        type: String
+      },
+      order: {
+        type: Number,
+        required: true
       }
     }],
     createdBy: {
@@ -82,6 +114,14 @@ const testSchema = new Schema<ITest>(
       type: Date
     },
     isPublished: {
+      type: Boolean,
+      default: false
+    },
+    resultsPublished: {
+      type: Boolean,
+      default: false
+    },
+    showResultsImmediately: {
       type: Boolean,
       default: false
     }

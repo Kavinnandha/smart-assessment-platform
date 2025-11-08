@@ -7,7 +7,9 @@ import {
   updateTest,
   deleteTest,
   publishTest,
-  unpublishTest
+  unpublishTest,
+  publishResults,
+  unpublishResults
 } from '../controllers/test.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { UserRole } from '../models/User.model';
@@ -34,6 +36,12 @@ router.patch('/:id/publish', authenticate, authorize(UserRole.TEACHER, UserRole.
 
 // Unpublish test (Teacher/Admin)
 router.patch('/:id/unpublish', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), unpublishTest);
+
+// Publish test results (Teacher/Admin)
+router.patch('/:id/publish-results', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), publishResults);
+
+// Unpublish test results (Teacher/Admin)
+router.patch('/:id/unpublish-results', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), unpublishResults);
 
 // Delete test (Teacher/Admin)
 router.delete('/:id', authenticate, authorize(UserRole.TEACHER, UserRole.ADMIN), deleteTest);

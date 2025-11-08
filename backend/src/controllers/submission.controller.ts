@@ -95,12 +95,26 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
     });
 
     await submission.save();
-    res.status(201).json({ 
-      message: 'Submission created successfully', 
-      submission,
-      autoGraded: allAutoGradable,
-      totalMarksObtained: allAutoGradable ? totalMarksObtained : undefined
-    });
+
+    // Check if results should be shown immediately
+    const shouldShowResults = test.showResultsImmediately;
+
+    if (shouldShowResults) {
+      // Show results immediately
+      res.status(201).json({ 
+        message: 'Submission created successfully', 
+        submission,
+        autoGraded: allAutoGradable,
+        totalMarksObtained: allAutoGradable ? totalMarksObtained : undefined,
+        showResults: true
+      });
+    } else {
+      // Hide results until teacher publishes them
+      res.status(201).json({ 
+        message: 'Submission created successfully. Results will be available after teacher evaluation.',
+        showResults: false
+      });
+    }
   } catch (error) {
     console.error('Create submission error:', error);
     res.status(500).json({ message: 'Server error' });

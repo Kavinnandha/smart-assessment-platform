@@ -19,6 +19,8 @@ interface Test {
   scheduledDate?: string;
   deadline?: string;
   isPublished: boolean;
+  showResultsImmediately?: boolean;
+  resultsPublished?: boolean;
   createdAt: string;
 }
 
@@ -110,6 +112,32 @@ const TestsPage = () => {
     }
   };
 
+  const handlePublishResults = async (id: string) => {
+    try {
+      await api.patch(`/tests/${id}/publish-results`);
+      alert('Test results published successfully');
+      fetchTests();
+    } catch (error) {
+      console.error('Failed to publish results:', error);
+      alert('Failed to publish results');
+    }
+  };
+
+  const handleUnpublishResults = async (id: string) => {
+    if (!window.confirm('Are you sure you want to unpublish the results? Students will no longer see their scores.')) {
+      return;
+    }
+
+    try {
+      await api.patch(`/tests/${id}/unpublish-results`);
+      alert('Test results unpublished successfully');
+      fetchTests();
+    } catch (error) {
+      console.error('Failed to unpublish results:', error);
+      alert('Failed to unpublish results');
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleString();
@@ -163,15 +191,28 @@ const TestsPage = () => {
                   </h3>
                   <p className="text-sm text-gray-600">{test.subject?.name || 'N/A'}</p>
                 </div>
-                {test.isPublished ? (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
-                    Published
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
-                    Draft
-                  </span>
-                )}
+                <div className="flex flex-col gap-1">
+                  {test.isPublished ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                      Published
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                      Draft
+                    </span>
+                  )}
+                  {isTeacher && test.isPublished && !test.showResultsImmediately && (
+                    test.resultsPublished ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        Results Published
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full">
+                        Results Pending
+                      </span>
+                    )
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2 mb-4">
@@ -202,24 +243,43 @@ const TestsPage = () => {
                     const submission = getSubmissionForTest(test._id);
                     
                     if (submission) {
-                      // Student has already submitted - show View Results button
-                      return (
-                        <div className="flex flex-col gap-2">
-                          <Link to={`/tests/submissions/evaluate/${submission._id}`} className="w-full">
-                            <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">
-                              <CheckCircle className="h-4 w-4 mr-2" />
-                              View Results
-                            </Button>
-                          </Link>
-                          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                            <span className="px-2 py-1 bg-gray-100 rounded">
-                              {submission.status === 'evaluated' 
-                                ? `Evaluated - ${submission.totalMarksObtained || 0}/${test.totalMarks}` 
-                                : 'Pending Evaluation'}
-                            </span>
+                      // Student has already submitted - check if results are available
+                      const canViewResults = test.showResultsImmediately || test.resultsPublished;
+                      
+                      if (canViewResults) {
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <Link to={`/tests/submissions/evaluate/${submission._id}`} className="w-full">
+                              <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                View Results
+                              </Button>
+                            </Link>
+                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                              <span className="px-2 py-1 bg-gray-100 rounded">
+                                {submission.status === 'evaluated' 
+                                  ? `Evaluated - ${submission.totalMarksObtained || 0}/${test.totalMarks}` 
+                                  : 'Pending Evaluation'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
+                        );
+                      } else {
+                        // Results not yet published by teacher
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <Button size="sm" className="w-full bg-gray-400 cursor-not-allowed" disabled>
+                              <Clock className="h-4 w-4 mr-2" />
+                              Results Pending
+                            </Button>
+                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
+                              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                                Submitted - Awaiting Result Publication
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
                     }
                     
                     // Student hasn't submitted yet - show Start Test button
@@ -301,6 +361,33 @@ const TestsPage = () => {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                    {!test.showResultsImmediately && test.isPublished && (
+                      <div className="flex gap-2">
+                        {test.resultsPublished ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleUnpublishResults(test._id)}
+                            className="flex-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                            title="Unpublish results - students will no longer see their scores"
+                          >
+                            <EyeOff className="h-4 w-4 mr-1" />
+                            Unpublish Results
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePublishResults(test._id)}
+                            className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="Publish results - students will be able to see their scores"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Publish Results
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

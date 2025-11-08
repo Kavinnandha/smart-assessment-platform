@@ -4,7 +4,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit, PlayCircle, Send, AlertCircle, CheckCircle, Download, File } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Calendar, Clock, Users, FileText, ArrowLeft, Eye, EyeOff, Edit, PlayCircle, Send, AlertCircle, CheckCircle, Download, File, ChevronDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface Question {
   _id: string;
@@ -32,6 +40,8 @@ interface Question {
     difficultyLevel: string;
     options?: string[];
     correctAnswer?: string;
+    answerLines?: number;
+    tags?: string[];
   };
   marks: number;
   order: number;
@@ -234,460 +244,629 @@ const TakeTestPage = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  const handleDownloadPDF = () => {
+  // Export option: Questions Only
+  const handleExportQuestionsOnly = () => {
+    if (!test) return;
+    generatePDF('questions-only');
+  };
+
+  // Export option: Questions with Answers Next to Each Question
+  const handleExportQuestionsWithAnswers = () => {
+    if (!test) return;
+    generatePDF('questions-with-answers');
+  };
+
+  // Export option: Questions with Answers at the End
+  const handleExportQuestionsAnswersAtEnd = () => {
+    if (!test) return;
+    generatePDF('questions-answers-end');
+  };
+
+  // Export option: Questions with Space for Answers
+  const handleExportQuestionsWithSpace = () => {
+    if (!test) return;
+    generatePDF('questions-with-space');
+  };
+
+  // Export option: Download Only Answers
+  const handleExportAnswersOnly = () => {
+    if (!test) return;
+    generatePDF('answers-only');
+  };
+
+  const generatePDF = async (exportType: 'questions-only' | 'questions-with-answers' | 'questions-answers-end' | 'questions-with-space' | 'answers-only') => {
     if (!test) return;
 
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to download the PDF');
-      return;
-    }
-
-    // Helper function to render question with attachments
-    const renderQuestionTextWithAttachments = (questionText: string, attachments?: Array<{
-      fileName: string;
-      fileUrl: string;
-      fileType: string;
-      fileSize: number;
-    }>) => {
-      if (!attachments || attachments.length === 0) {
-        return questionText;
-      }
-
-      // Check if question text contains attachment placeholders
-      const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
-      let processedText = questionText;
-      
-      // Replace placeholders with actual attachment HTML
-      processedText = processedText.replace(placeholderRegex, (match, index) => {
-        const attachmentIndex = parseInt(index);
-        if (attachmentIndex < attachments.length) {
-          const attachment = attachments[attachmentIndex];
-          const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
-          
-          if (attachment.fileType.startsWith('image/')) {
-            return `<div style="margin: 12px 0;">
-              <img src="${fileUrl}" alt="${attachment.fileName}" style="max-width: 100%; max-height: 400px; border: 1px solid #e5e7eb; border-radius: 8px; display: block;" />
-              <p style="font-size: 11px; color: #6b7280; margin-top: 4px; font-style: italic;">${attachment.fileName}</p>
-            </div>`;
-          } else {
-            return `<div style="margin: 8px 0; padding: 8px; background-color: #f3f4f6; border-radius: 6px; border: 1px solid #d1d5db;">
-              <span style="font-size: 12px; color: #374151;">📎 Attachment: ${attachment.fileName}</span>
-              <br/><span style="font-size: 10px; color: #6b7280;">${fileUrl}</span>
-            </div>`;
-          }
-        }
-        return match;
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
       });
 
-      return processedText;
-    };
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - (margin * 2);
+      let yPosition = margin;
 
-    // Helper function to render attachments section
-    const renderAttachmentsSection = (attachments: Array<{
-      fileName: string;
-      fileUrl: string;
-      fileType: string;
-      fileSize: number;
-    }>) => {
-      return attachments.map(attachment => {
-        const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+      // Helper function to decode HTML entities and strip HTML tags
+      const decodeHTML = (html: string): string => {
+        if (!html || typeof html !== 'string') return '';
         
-        if (attachment.fileType.startsWith('image/')) {
-          return `<div style="margin: 12px 0;">
-            <img src="${fileUrl}" alt="${attachment.fileName}" style="max-width: 100%; max-height: 400px; border: 1px solid #e5e7eb; border-radius: 8px; display: block;" />
-            <p style="font-size: 11px; color: #6b7280; margin-top: 4px; font-style: italic;">${attachment.fileName}</p>
-          </div>`;
-        } else {
-          return `<div style="margin: 8px 0; padding: 8px; background-color: #f3f4f6; border-radius: 6px; border: 1px solid #d1d5db;">
-            <span style="font-size: 12px; color: #374151;">📎 ${attachment.fileName}</span>
-            <br/><span style="font-size: 10px; color: #6b7280;">URL: ${fileUrl}</span>
-          </div>`;
+        // Create a temporary div element for decoding
+        const tempDiv = document.createElement('div');
+        
+        // First pass: decode HTML entities
+        tempDiv.innerHTML = html;
+        let decoded = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // Clean up the div
+        tempDiv.remove();
+        
+        // Additional cleanup for common encoding issues
+        decoded = decoded
+          // Remove attachment placeholders first
+          .replace(/\{\{attachment:\d+\}\}/g, '')
+          // Fix double-encoded ampersands
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&apos;/g, "'")
+          .replace(/&nbsp;/g, ' ')
+          // Fix any remaining HTML entities
+          .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+          .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+          // Remove any stray HTML tags that might remain
+          .replace(/<[^>]*>/g, '')
+          // Replace multiple spaces with single space (but preserve single line breaks)
+          .replace(/ +/g, ' ')
+          // Clean up line breaks
+          .replace(/\r\n/g, '\n')
+          .replace(/\r/g, '\n')
+          // Remove empty lines created by placeholder removal
+          .replace(/\n\s*\n/g, '\n')
+          .trim();
+        
+        return decoded;
+      };
+
+      // Helper function to check if we need a new page
+      const checkPageBreak = (requiredHeight: number) => {
+        if (yPosition + requiredHeight > pageHeight - margin) {
+          doc.addPage();
+          yPosition = margin;
+          return true;
         }
-      }).join('');
-    };
+        return false;
+      };
 
-    // Generate HTML content for the PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>${test.title} - Test Details</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 40px;
-            color: #1f2937;
-            line-height: 1.6;
-          }
-          
-          .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 3px solid #2563eb;
-          }
-          
-          .header h1 {
-            font-size: 28px;
-            color: #1e40af;
-            margin-bottom: 8px;
-          }
-          
-          .header p {
-            font-size: 16px;
-            color: #6b7280;
-          }
-          
-          .status-badge {
-            display: inline-block;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 10px;
-          }
-          
-          .status-published {
-            background-color: #d1fae5;
-            color: #065f46;
-          }
-          
-          .status-draft {
-            background-color: #fef3c7;
-            color: #92400e;
-          }
-          
-          .description {
-            background-color: #f3f4f6;
-            padding: 16px;
-            border-radius: 8px;
-            margin: 20px 0;
-            font-style: italic;
-          }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            margin: 30px 0;
-            padding: 20px;
-            background-color: #f9fafb;
-            border-radius: 8px;
-          }
-          
-          .info-item {
-            display: flex;
-            flex-direction: column;
-          }
-          
-          .info-label {
-            font-size: 12px;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 4px;
-          }
-          
-          .info-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: #1f2937;
-          }
-          
-          .section {
-            margin: 30px 0;
-            page-break-inside: avoid;
-          }
-          
-          .section-title {
-            font-size: 20px;
-            font-weight: 700;
-            color: #1e40af;
-            margin-bottom: 16px;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #dbeafe;
-          }
-          
-          .question-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-            background-color: #ffffff;
-            page-break-inside: avoid;
-          }
-          
-          .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-          }
-          
-          .question-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            background-color: #dbeafe;
-            color: #1e40af;
-            border-radius: 50%;
-            font-weight: 700;
-            font-size: 14px;
-            flex-shrink: 0;
-          }
-          
-          .question-content {
-            flex: 1;
-            margin-left: 16px;
-          }
-          
-          .question-id {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 4px;
-          }
-          
-          .question-text {
-            font-size: 15px;
-            font-weight: 500;
-            color: #1f2937;
-            margin-bottom: 8px;
-          }
-          
-          .question-marks {
-            background-color: #dbeafe;
-            color: #1e40af;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
-          }
-          
-          .question-meta {
-            display: flex;
-            gap: 16px;
-            margin-top: 8px;
-            font-size: 13px;
-            color: #6b7280;
-          }
-          
-          .difficulty-badge {
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: capitalize;
-          }
-          
-          .difficulty-easy {
-            background-color: #d1fae5;
-            color: #065f46;
-          }
-          
-          .difficulty-medium {
-            background-color: #fef3c7;
-            color: #92400e;
-          }
-          
-          .difficulty-hard {
-            background-color: #fee2e2;
-            color: #991b1b;
-          }
-          
-          .student-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-          }
-          
-          .student-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            padding: 12px;
-            background-color: #f9fafb;
-          }
-          
-          .student-name {
-            font-weight: 600;
-            color: #1f2937;
-            margin-bottom: 2px;
-          }
-          
-          .student-email {
-            font-size: 13px;
-            color: #6b7280;
-          }
-          
-          .footer {
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 2px solid #e5e7eb;
-            text-align: center;
-            font-size: 12px;
-            color: #9ca3af;
-          }
-          
-          .no-data {
-            text-align: center;
-            color: #9ca3af;
-            padding: 20px;
-            font-style: italic;
-          }
-          
-          @media print {
-            body {
-              padding: 20px;
-            }
+      // Helper function to convert image URL to data URL
+      const getImageDataUrl = async (url: string): Promise<string | null> => {
+        try {
+          const fullUrl = url.startsWith('http') ? url : `${FILE_BASE_URL}${url}`;
+          const response = await fetch(fullUrl);
+          const blob = await response.blob();
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        } catch (error) {
+          console.error('Failed to load image:', error);
+          return null;
+        }
+      };
+
+      // Helper function to add image to PDF
+      const addImageToPDF = async (imageUrl: string, maxWidth: number = contentWidth - 40) => {
+        const dataUrl = await getImageDataUrl(imageUrl);
+        if (dataUrl) {
+          try {
+            // Create temporary image to get dimensions
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = dataUrl;
+            });
+
+            // Calculate dimensions to fit within page
+            let imgWidth = img.width * 0.264583; // Convert px to mm
+            let imgHeight = img.height * 0.264583;
             
-            .question-card, .section {
-              page-break-inside: avoid;
+            // Scale down if too wide
+            if (imgWidth > maxWidth) {
+              const ratio = maxWidth / imgWidth;
+              imgWidth = maxWidth;
+              imgHeight = imgHeight * ratio;
             }
+
+            // Scale down if too tall
+            const maxHeight = pageHeight - margin - yPosition - 20;
+            if (imgHeight > maxHeight) {
+              const ratio = maxHeight / imgHeight;
+              imgHeight = maxHeight;
+              imgWidth = imgWidth * ratio;
+            }
+
+            checkPageBreak(imgHeight + 10);
+            
+            doc.addImage(dataUrl, 'JPEG', margin + 20, yPosition, imgWidth, imgHeight);
+            yPosition += imgHeight + 5;
+            return true;
+          } catch (error) {
+            console.error('Failed to add image to PDF:', error);
+            return false;
           }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>${test.title}</h1>
-          <p>${test.subject?.name || 'N/A'}</p>
-          <span class="status-badge ${test.isPublished ? 'status-published' : 'status-draft'}">
-            ${test.isPublished ? 'Published' : 'Draft'}
-          </span>
-        </div>
+        }
+        return false;
+      };
 
-        ${test.description ? `
-          <div class="description">
-            ${test.description}
-          </div>
-        ` : ''}
+      // Helper function to add attachments to PDF
+      const addAttachmentsToPDF = async (attachments: Array<{
+        fileName: string;
+        fileUrl: string;
+        fileType: string;
+        fileSize: number;
+      }>) => {
+        if (!attachments || attachments.length === 0) return;
 
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Duration</span>
-            <span class="info-value">${test.duration} minutes</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Total Questions</span>
-            <span class="info-value">${test.questions.length}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Total Marks</span>
-            <span class="info-value">${test.totalMarks}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Assigned Students</span>
-            <span class="info-value">${test.assignedTo.length}</span>
-          </div>
-          ${test.scheduledDate ? `
-            <div class="info-item">
-              <span class="info-label">Scheduled Date</span>
-              <span class="info-value">${formatDate(test.scheduledDate)}</span>
-            </div>
-          ` : ''}
-          ${test.deadline ? `
-            <div class="info-item">
-              <span class="info-label">Deadline</span>
-              <span class="info-value">${formatDate(test.deadline)}</span>
-            </div>
-          ` : ''}
-        </div>
+        // No label text - just add attachments directly
+        for (const attachment of attachments) {
+          if (attachment.fileType.startsWith('image/')) {
+            // Embed image without filename
+            await addImageToPDF(attachment.fileUrl);
+          } else {
+            // Non-image file - add as link without label
+            checkPageBreak(8);
+            doc.setFontSize(9);
+            doc.setTextColor(37, 99, 235);
+            doc.textWithLink(`${attachment.fileName}`, margin + 22, yPosition, {
+              url: `${FILE_BASE_URL}${attachment.fileUrl}`
+            });
+            yPosition += 6;
+          }
+        }
+        yPosition += 3;
+      };
 
-        <div class="section">
-          <h2 class="section-title">Questions (${test.questions.length})</h2>
-          ${test.questions
-            .sort((a, b) => a.order - b.order)
-            .map((item, index) => {
-              const hasAttachments = item.question.attachments && item.question.attachments.length > 0;
-              const hasCustomPositioning = hasAttachments && item.question.questionText.includes('{{attachment:');
-              
-              // Render attachments before question if position is 'before'
-              const beforeAttachments = hasAttachments && item.question.attachmentPosition === 'before' 
-                ? renderAttachmentsSection(item.question.attachments!) 
-                : '';
-              
-              // Render question text with inline attachments if custom positioning
-              const questionTextHtml = hasCustomPositioning
-                ? renderQuestionTextWithAttachments(item.question.questionText, item.question.attachments!)
-                : item.question.questionText;
-              
-              // Render attachments after question if position is 'after' or undefined
-              const afterAttachments = hasAttachments && (!item.question.attachmentPosition || item.question.attachmentPosition === 'after')
-                ? renderAttachmentsSection(item.question.attachments!)
-                : '';
-              
-              return `
-                <div class="question-card">
-                  <div class="question-header">
-                    <div style="display: flex; align-items: flex-start; flex: 1;">
-                      <div class="question-number">${index + 1}</div>
-                      <div class="question-content">
-                        <div class="question-id">Q${index + 1}</div>
-                        ${beforeAttachments}
-                        <div class="question-text">${questionTextHtml}</div>
-                        ${afterAttachments}
-                        <div class="question-meta">
-                          <span>Chapter: ${item.question.chapter}</span>
-                          ${item.question.topic ? `<span>Topic: ${item.question.topic}</span>` : ''}
-                          <span class="difficulty-badge difficulty-${item.question.difficultyLevel}">
-                            ${item.question.difficultyLevel}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="question-marks">${item.marks} marks</div>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-        </div>
+      // Helper function to add wrapped text with HTML entity decoding
+      const addWrappedText = (text: string, x: number, fontSize: number, maxWidth: number, fontStyle: string = 'normal') => {
+        // Pre-process to remove attachment placeholders before any other processing
+        const preprocessedText = text.replace(/\{\{attachment:\d+\}\}/g, '');
+        
+        // Decode HTML entities and strip tags before rendering
+        const decodedText = decodeHTML(preprocessedText);
+        
+        // Additional safety check to remove any problematic characters
+        const cleanText = decodedText
+          .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+          .replace(/[^\x00-\x7F]/g, (char) => {
+            // Replace non-ASCII characters with ASCII equivalents where possible
+            const charCode = char.charCodeAt(0);
+            if (charCode > 127) {
+              // Common replacements for special characters
+              const replacements: Record<string, string> = {
+                '\u2713': 'v', // ✓
+                '\u2717': 'x', // ✗
+                '\u{1F4CE}': '', // 📎
+                '\u{1F517}': '', // 🔗
+                '\u201C': '"', // "
+                '\u201D': '"', // "
+                '\u2018': "'", // '
+                '\u2019': "'", // '
+                '\u2013': '-', // –
+                '\u2014': '-', // —
+                '\u2026': '...' // …
+              };
+              return replacements[char] || '';
+            }
+            return char;
+          });
+        
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', fontStyle);
+        const lines = doc.splitTextToSize(cleanText, maxWidth);
+        
+        for (let i = 0; i < lines.length; i++) {
+          checkPageBreak(7);
+          doc.text(lines[i], x, yPosition);
+          yPosition += 7;
+        }
+        return lines.length;
+      };
 
-        <div class="section">
-          <h2 class="section-title">Assigned Students (${test.assignedTo.length})</h2>
-          ${test.assignedTo.length === 0 ? `
-            <div class="no-data">No students assigned to this test</div>
-          ` : `
-            <div class="student-grid">
-              ${test.assignedTo.map(student => `
-                <div class="student-card">
-                  <div class="student-name">${student.name}</div>
-                  <div class="student-email">${student.email}</div>
-                </div>
-              `).join('')}
-            </div>
-          `}
-        </div>
+      // Only render header for non-answers-only exports
+      if (exportType !== 'answers-only') {
+        // Header
+        doc.setFillColor(37, 99, 235); // Blue
+        doc.rect(0, 0, pageWidth, 30, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text(test.title, pageWidth / 2, 15, { align: 'center' });
+        
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.text(test.subject?.name || 'N/A', pageWidth / 2, 23, { align: 'center' });
+        
+        yPosition = 40;
 
-        <div class="footer">
-          <p>Created by ${test.createdBy.name} on ${formatDate(test.createdAt)}</p>
-          <p style="margin-top: 8px;">Generated on ${new Date().toLocaleString()}</p>
-        </div>
-      </body>
-      </html>
-    `;
+        // Test Info
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        
+        const infoItems = [
+          `Duration: ${test.duration} minutes`,
+          `Questions: ${test.questions.length}`,
+          `Total Marks: ${test.totalMarks}`,
+          `Status: ${test.isPublished ? 'Published' : 'Draft'}`
+        ];
+        
+        const infoWidth = contentWidth / 4;
+        infoItems.forEach((item, index) => {
+          doc.text(item, margin + (index * infoWidth), yPosition);
+        });
+        
+        yPosition += 10;
+        
+        // Line separator
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, yPosition, pageWidth - margin, yPosition);
+        yPosition += 10;
+      } else {
+        // For answers-only, simpler header
+        doc.setFillColor(16, 185, 129); // Green
+        doc.rect(0, 0, pageWidth, 25, 'F');
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${test.title} - Answer Key`, pageWidth / 2, 15, { align: 'center' });
+        
+        yPosition = 35;
+      }
 
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+      const sortedQuestions = [...test.questions].sort((a, b) => a.order - b.order);
 
-    // Wait for content to load, then trigger print
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print();
-        // Close the window after printing (user can cancel this)
-        printWindow.onafterprint = () => {
-          printWindow.close();
-        };
-      }, 250);
-    };
+      // Render based on export type
+      if (exportType === 'answers-only') {
+        // Render only answers
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Answer Key', margin, yPosition);
+        yPosition += 10;
+
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(20);
+          
+          // Question number circle
+          doc.setFillColor(220, 252, 231); // Light green
+          doc.circle(margin + 5, yPosition, 5, 'F');
+          doc.setTextColor(6, 95, 70); // Dark green
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 5, yPosition + 1.5, { align: 'center' });
+          
+          yPosition += 8;
+          
+          // Answer box
+          checkPageBreak(15);
+          const answerBoxHeight = Math.max(15, Math.ceil((item.question.correctAnswer?.length || 20) / 50) * 5);
+          doc.setFillColor(209, 250, 229); // Light green
+          doc.roundedRect(margin + 10, yPosition, contentWidth - 10, answerBoxHeight, 3, 3, 'F');
+          doc.setDrawColor(16, 185, 129); // Green border
+          doc.setLineWidth(0.5);
+          doc.roundedRect(margin + 10, yPosition, contentWidth - 10, answerBoxHeight, 3, 3, 'S');
+          
+          yPosition += 5;
+          
+          doc.setTextColor(6, 78, 59);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const answer = item.question.correctAnswer || 'Not provided';
+          addWrappedText(answer, margin + 12, 10, contentWidth - 14, 'normal');
+          
+          yPosition += 5;
+          
+          // Add answer attachments if they exist
+          if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
+            await addAttachmentsToPDF(item.question.correctAnswerAttachments);
+          }
+          
+          yPosition += 5;
+        }
+      } else if (exportType === 'questions-only') {
+        // Questions section title
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Questions (${test.questions.length})`, margin, yPosition);
+        yPosition += 10;
+
+        // Render each question
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(25);
+          
+          // Question card background
+          doc.setFillColor(249, 250, 251);
+          doc.setDrawColor(229, 231, 235);
+          doc.setLineWidth(0.5);
+          
+          // Question number circle
+          doc.setFillColor(219, 234, 254);
+          doc.circle(margin + 8, yPosition + 3, 5, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
+          
+          // Marks badge
+          doc.setFillColor(219, 234, 254);
+          doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
+          
+          // Question text
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'normal');
+          yPosition += 5;
+          addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
+          
+          // Add question attachments if they exist
+          if (item.question.attachments && item.question.attachments.length > 0) {
+            await addAttachmentsToPDF(item.question.attachments);
+          }
+          
+          yPosition += 8;
+        }
+      } else if (exportType === 'questions-with-answers') {
+        // Questions with inline answers
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Questions (${test.questions.length})`, margin, yPosition);
+        yPosition += 10;
+
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(30);
+          
+          // Question section (background will auto-expand with content)
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(11);
+          
+          doc.setFillColor(219, 234, 254);
+          doc.circle(margin + 8, yPosition + 3, 5, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
+          
+          doc.setFillColor(219, 234, 254);
+          doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
+          
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(11);
+          yPosition += 5;
+          addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
+          
+          // Add question attachments if they exist
+          if (item.question.attachments && item.question.attachments.length > 0) {
+            await addAttachmentsToPDF(item.question.attachments);
+          }
+          
+          yPosition += 3;
+          
+          // Answer box (inline) - adding some padding for the answer
+          checkPageBreak(15);
+          
+          yPosition += 5;
+          
+          doc.setTextColor(6, 78, 59);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const answer = item.question.correctAnswer || 'Not provided';
+          addWrappedText(answer, margin + 22, 10, contentWidth - 29, 'normal');
+          
+          // Add answer attachments if they exist
+          if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
+            await addAttachmentsToPDF(item.question.correctAnswerAttachments);
+          }
+          
+          yPosition += 8;
+        }
+      } else if (exportType === 'questions-with-space') {
+        // Questions with answer space
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Questions (${test.questions.length})`, margin, yPosition);
+        yPosition += 10;
+
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(40);
+          
+          // Question section (no background box for simplicity)
+          doc.setFillColor(219, 234, 254);
+          doc.circle(margin + 8, yPosition + 3, 5, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
+          
+          doc.setFillColor(219, 234, 254);
+          doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
+          
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(11);
+          yPosition += 5;
+          addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
+          
+          // Add question attachments if they exist
+          if (item.question.attachments && item.question.attachments.length > 0) {
+            await addAttachmentsToPDF(item.question.attachments);
+          }
+          
+          yPosition += 3;
+          
+          // Answer space (box for writing) - use dynamic height based on answerLines
+          const answerLines = item.question.answerLines || 3;
+          const lineHeight = 6;
+          const answerBoxHeight = answerLines * lineHeight + 4; // +4 for padding
+          
+          checkPageBreak(answerBoxHeight + 5);
+          doc.setDrawColor(209, 213, 219);
+          doc.setLineWidth(0.3);
+          // Dashed border effect using multiple short lines
+          doc.rect(margin + 20, yPosition, contentWidth - 25, answerBoxHeight, 'S');
+          
+          // Draw horizontal lines for each answer line
+          doc.setDrawColor(229, 231, 235);
+          doc.setLineWidth(0.1);
+          for (let line = 1; line < answerLines; line++) {
+            const lineY = yPosition + (line * lineHeight) + 2;
+            doc.line(margin + 22, lineY, margin + contentWidth - 7, lineY);
+          }
+          
+          doc.setFontSize(8);
+          doc.setTextColor(156, 163, 175);
+          doc.text(`Space for answer (${answerLines} lines)`, margin + (contentWidth / 2), yPosition + (answerBoxHeight / 2) + 1, { align: 'center' });
+          
+          yPosition += answerBoxHeight + 5;
+        }
+      } else if (exportType === 'questions-answers-end') {
+        // Questions section
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`Questions (${test.questions.length})`, margin, yPosition);
+        yPosition += 10;
+
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(25);
+          
+          // No background box for simplicity
+          doc.setFillColor(219, 234, 254);
+          doc.circle(margin + 8, yPosition + 3, 5, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
+          
+          doc.setFillColor(219, 234, 254);
+          doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
+          doc.setTextColor(30, 64, 175);
+          doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
+          
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(11);
+          yPosition += 5;
+          addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
+          
+          // Add question attachments if they exist
+          if (item.question.attachments && item.question.attachments.length > 0) {
+            await addAttachmentsToPDF(item.question.attachments);
+          }
+          
+          yPosition += 8;
+        }
+
+        // New page for answers
+        doc.addPage();
+        yPosition = margin;
+        
+        doc.setFillColor(16, 185, 129);
+        doc.rect(0, 0, pageWidth, 25, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Answer Key', pageWidth / 2, 15, { align: 'center' });
+        
+        yPosition = 35;
+
+        for (let index = 0; index < sortedQuestions.length; index++) {
+          const item = sortedQuestions[index];
+          checkPageBreak(20);
+          
+          // No background box for simplicity  
+          doc.setFillColor(220, 252, 231);
+          doc.circle(margin + 8, yPosition + 3, 5, 'F');
+          doc.setTextColor(6, 95, 70);
+          doc.setFontSize(12);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
+          
+          yPosition += 10;
+          
+          checkPageBreak(15);
+          
+          doc.setTextColor(6, 78, 59);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'normal');
+          const answer = item.question.correctAnswer || 'Not provided';
+          addWrappedText(answer, margin + 17, 10, contentWidth - 19, 'normal');
+          
+          // Add answer attachments if they exist
+          if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
+            await addAttachmentsToPDF(item.question.correctAnswerAttachments);
+          }
+          
+          yPosition += 8;
+        }
+      }
+
+      // Footer
+      const currentDate = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      
+      const totalPages = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(156, 163, 175);
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.text(`Generated on ${currentDate}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+      }
+
+      // Generate filename based on export type
+      const exportTypeNames = {
+        'questions-only': 'Questions_Only',
+        'questions-with-answers': 'Questions_with_Answers_Inline',
+        'questions-answers-end': 'Questions_with_Answers_End',
+        'questions-with-space': 'Questions_with_Answer_Space',
+        'answers-only': 'Answer_Key'
+      };
+      
+      const fileName = `${test.title.replace(/[^a-z0-9]/gi, '_')}_${exportTypeNames[exportType]}.pdf`;
+      
+      // Save the PDF
+      doc.save(fileName);
+      
+    } catch (error) {
+      console.error('Failed to generate PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
 
@@ -718,7 +897,6 @@ const TakeTestPage = () => {
         <>
           <p className="text-lg font-medium text-gray-900 mb-2">{questionText}</p>
           <div className="mt-4 space-y-2">
-            <p className="text-sm font-medium text-gray-700">Attachments:</p>
             {attachments.map((attachment, idx) => renderAttachment(attachment, idx))}
           </div>
         </>
@@ -728,9 +906,11 @@ const TakeTestPage = () => {
     // Split text by placeholders and render inline
     const parts: (string | React.ReactNode)[] = [];
     let lastIndex = 0;
-    const matches = questionText.matchAll(/\{\{attachment:(\d+)\}\}/g);
-
-    for (const match of matches) {
+    
+    // First, collect all placeholders and their positions
+    const placeholderMatches = Array.from(questionText.matchAll(/\{\{attachment:(\d+)\}\}/g));
+    
+    for (const match of placeholderMatches) {
       const matchIndex = match.index!;
       const attachmentIndex = parseInt(match[1]);
 
@@ -739,7 +919,7 @@ const TakeTestPage = () => {
         parts.push(questionText.substring(lastIndex, matchIndex));
       }
 
-      // Add attachment
+      // Add attachment (without placeholder text)
       if (attachmentIndex < attachments.length) {
         parts.push(
           <div key={`attachment-${attachmentIndex}`} className="my-4">
@@ -774,14 +954,11 @@ const TakeTestPage = () => {
     return (
       <div key={idx} className="inline-block w-full">
         {attachment.fileType.startsWith('image/') ? (
-          <div className="space-y-2">
-            <img 
-              src={`${FILE_BASE_URL}${attachment.fileUrl}`}
-              alt={attachment.fileName}
-              className="max-w-2xl rounded-lg border shadow-sm"
-            />
-            <p className="text-xs text-gray-500">{attachment.fileName}</p>
-          </div>
+          <img 
+            src={`${FILE_BASE_URL}${attachment.fileUrl}`}
+            alt="Question attachment"
+            className="max-w-2xl rounded-lg border shadow-sm"
+          />
         ) : (
           <div className="flex items-center gap-2 p-3 bg-gray-50 border rounded-lg max-w-md">
             <File className="w-5 h-5 text-gray-500 shrink-0" />
@@ -1119,14 +1296,40 @@ const TakeTestPage = () => {
         </Button>
 
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleDownloadPDF}
-            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export Test
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuItem onClick={handleExportQuestionsOnly}>
+                <FileText className="h-4 w-4 mr-2" />
+                Questions Only
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportQuestionsWithAnswers}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Questions with Answers (inline)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportQuestionsAnswersAtEnd}>
+                <File className="h-4 w-4 mr-2" />
+                Questions with Answers (at end)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportQuestionsWithSpace}>
+                <Edit className="h-4 w-4 mr-2" />
+                Questions with Space for Answers
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportAnswersOnly}>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Download Only Answers
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           
           <Button
             variant="outline"
