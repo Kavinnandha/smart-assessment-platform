@@ -702,19 +702,19 @@ const CreateTestPage = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">
+    <div className="max-w-7xl mx-auto space-y-6">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
         {isEditMode ? 'Edit Test' : 'Create Test'}
       </h1>
 
       {/* Tab Navigation */}
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex gap-6">
+          <nav className="-mb-px flex gap-3 sm:gap-6 overflow-x-auto">
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
                 currentStep === 1
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -725,7 +725,7 @@ const CreateTestPage = () => {
             <button
               type="button"
               onClick={() => setCurrentStep(2)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
                 currentStep === 2
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -736,7 +736,7 @@ const CreateTestPage = () => {
             <button
               type="button"
               onClick={() => setCurrentStep(3)}
-              className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
                 currentStep === 3
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -748,15 +748,15 @@ const CreateTestPage = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Step 1: Test Information */}
         {currentStep === 1 && (
           <>
             {/* Basic Information */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Test Information</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4">Test Information</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
                   <Label htmlFor="title">Test Title *</Label>
                   <Input
                     id="title"
@@ -764,10 +764,11 @@ const CreateTestPage = () => {
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
                     placeholder="e.g., Midterm Exam - Mathematics"
+                    className="text-base"
                   />
                 </div>
 
-                <div>
+                <div className="sm:col-span-1">
                   <Label htmlFor="subject">Subject *</Label>
                   <select
                     id="subject"
@@ -777,7 +778,7 @@ const CreateTestPage = () => {
                       setFilters({ ...filters, subject: e.target.value, chapter: '' });
                     }}
                     required
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base"
                   >
                     <option value="">Select Subject</option>
                     {subjects.map((subject) => (
@@ -788,7 +789,7 @@ const CreateTestPage = () => {
                   </select>
                 </div>
 
-                <div>
+                <div className="sm:col-span-1">
                   <Label htmlFor="duration">Duration (minutes) *</Label>
                   <Input
                     id="duration"
@@ -797,6 +798,7 @@ const CreateTestPage = () => {
                     onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
                     required
                     min="1"
+                    className="text-base"
                   />
                 </div>
 

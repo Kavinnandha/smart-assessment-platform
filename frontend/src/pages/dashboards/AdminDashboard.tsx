@@ -35,76 +35,76 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="mt-2 text-gray-600">Welcome, {user?.name}! Manage the entire platform</p>
+    <div className="space-y-6">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+        <p className="mt-2 text-sm sm:text-base text-gray-600">Welcome, {user?.name}! Manage the entire platform</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Tests</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats?.totalTests || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Total Tests</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats?.totalTests || 0}</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FileText className="h-6 w-6 text-blue-600" />
+            <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Questions</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">{stats?.totalQuestions || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Total Questions</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{stats?.totalQuestions || 0}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FileQuestion className="h-6 w-6 text-green-600" />
+            <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+              <FileQuestion className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Submissions</p>
-              <p className="text-3xl font-bold text-purple-600 mt-2">{stats?.totalSubmissions || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Total Submissions</p>
+              <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{stats?.totalSubmissions || 0}</p>
             </div>
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Database className="h-6 w-6 text-purple-600" />
+            <div className="p-2 sm:p-3 bg-purple-100 rounded-lg">
+              <Database className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Admin Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Button className="h-24" onClick={() => window.location.href = '/users'}>
+      <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Admin Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/users'}>
             <div className="text-center">
-              <Users className="h-6 w-6 mx-auto mb-2" />
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>Manage Users</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/questions'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/questions'}>
             <div className="text-center">
-              <FileQuestion className="h-6 w-6 mx-auto mb-2" />
+              <FileQuestion className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>All Questions</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/tests'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/tests'}>
             <div className="text-center">
-              <FileText className="h-6 w-6 mx-auto mb-2" />
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>All Tests</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/reports'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/reports'}>
             <div className="text-center">
-              <Database className="h-6 w-6 mx-auto mb-2" />
+              <Database className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>System Analytics</span>
             </div>
           </Button>

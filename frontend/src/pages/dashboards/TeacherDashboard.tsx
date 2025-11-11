@@ -35,76 +35,76 @@ const TeacherDashboard = () => {
   }
 
   return (
-    <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.name}!</h1>
-        <p className="mt-2 text-gray-600">Manage your questions, tests, and evaluations</p>
+    <div className="space-y-6">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome, {user?.name}!</h1>
+        <p className="mt-2 text-sm sm:text-base text-gray-600">Manage your questions, tests, and evaluations</p>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">My Questions</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats?.myQuestions || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">My Questions</p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{stats?.myQuestions || 0}</p>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <FileQuestion className="h-6 w-6 text-blue-600" />
+            <div className="p-2 sm:p-3 bg-blue-100 rounded-lg">
+              <FileQuestion className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">My Tests</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">{stats?.myTests || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">My Tests</p>
+              <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{stats?.myTests || 0}</p>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FileText className="h-6 w-6 text-green-600" />
+            <div className="p-2 sm:p-3 bg-green-100 rounded-lg">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
+        <div className="bg-white p-5 sm:p-6 rounded-lg shadow sm:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Pending Evaluations</p>
-              <p className="text-3xl font-bold text-orange-600 mt-2">{stats?.pendingEvaluations || 0}</p>
+              <p className="text-xs sm:text-sm text-gray-600">Pending Evaluations</p>
+              <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-2">{stats?.pendingEvaluations || 0}</p>
             </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <ClipboardList className="h-6 w-6 text-orange-600" />
+            <div className="p-2 sm:p-3 bg-orange-100 rounded-lg">
+              <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Button className="h-24" onClick={() => window.location.href = '/questions/create'}>
+      <div className="bg-white p-5 sm:p-6 rounded-lg shadow">
+        <h2 className="text-lg sm:text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/questions/create'}>
             <div className="text-center">
-              <Plus className="h-6 w-6 mx-auto mb-2" />
+              <Plus className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>Create Question</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/tests/create'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/tests/create'}>
             <div className="text-center">
-              <Plus className="h-6 w-6 mx-auto mb-2" />
+              <Plus className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>Create Test</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/tests/submissions'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/tests/submissions'}>
             <div className="text-center">
-              <ClipboardList className="h-6 w-6 mx-auto mb-2" />
+              <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>Evaluate Submissions</span>
             </div>
           </Button>
-          <Button className="h-24" onClick={() => window.location.href = '/reports'}>
+          <Button className="h-20 sm:h-24 text-sm sm:text-base" onClick={() => window.location.href = '/reports'}>
             <div className="text-center">
-              <FileText className="h-6 w-6 mx-auto mb-2" />
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-2" />
               <span>View Analytics</span>
             </div>
           </Button>

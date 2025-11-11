@@ -57,15 +57,15 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 bg-white rounded-lg shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
-          <p className="mt-2 text-gray-600">Register for Smart Assessment Platform</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create Account</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600">Register for Smart Assessment Platform</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -81,6 +81,7 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your full name"
+              className="text-base"
             />
           </div>
 
@@ -94,6 +95,7 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your email"
+              className="text-base"
             />
           </div>
 
@@ -104,7 +106,7 @@ const RegisterPage = () => {
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
@@ -122,6 +124,7 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your password"
+              className="text-base"
             />
           </div>
 
@@ -135,6 +138,7 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Confirm your password"
+              className="text-base"
             />
           </div>
 

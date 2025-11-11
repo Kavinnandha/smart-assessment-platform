@@ -29,15 +29,15 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 bg-white rounded-lg shadow-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Smart Assessment Platform</h1>
-          <p className="mt-2 text-gray-600">Sign in to your account</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Smart Assessment Platform</h1>
+          <p className="mt-2 text-sm sm:text-base text-gray-600">Sign in to your account</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
             {error}
           </div>
         )}
@@ -52,6 +52,7 @@ const LoginPage = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="Enter your email"
+              className="text-base"
             />
           </div>
 
@@ -64,6 +65,7 @@ const LoginPage = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               placeholder="Enter your password"
+              className="text-base"
             />
           </div>
 
