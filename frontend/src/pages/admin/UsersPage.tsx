@@ -191,13 +191,13 @@ const UsersPage = () => {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'admin':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800';
       case 'teacher':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800';
       case 'student':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -218,8 +218,8 @@ const UsersPage = () => {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2 text-gray-600">Loading users...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">Loading users...</p>
         </div>
       </div>
     );
@@ -230,7 +230,7 @@ const UsersPage = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Users Management</h1>
-          <p className="text-gray-600 mt-1">Manage system users and their roles</p>
+          <p className="text-muted-foreground mt-1">Manage system users and their roles</p>
         </div>
         <Button onClick={() => handleOpenDialog()} className="gap-2">
           <UserPlus className="h-4 w-4" />
@@ -239,7 +239,7 @@ const UsersPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border flex gap-4">
+      <div className="bg-card p-4 rounded-lg shadow-sm border flex gap-4">
         <div className="flex-1">
           <Input
             placeholder="Search by name or email..."
@@ -264,46 +264,46 @@ const UsersPage = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Users className="h-6 w-6 text-purple-600" />
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+              <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Total Users</p>
+              <p className="text-sm text-muted-foreground">Total Users</p>
               <p className="text-2xl font-bold">{users.length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <Shield className="h-6 w-6 text-red-600" />
+            <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+              <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Admins</p>
+              <p className="text-sm text-muted-foreground">Admins</p>
               <p className="text-2xl font-bold">{users.filter(u => u.role === 'admin').length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <GraduationCap className="h-6 w-6 text-blue-600" />
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <GraduationCap className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Teachers</p>
+              <p className="text-sm text-muted-foreground">Teachers</p>
               <p className="text-2xl font-bold">{users.filter(u => u.role === 'teacher').length}</p>
             </div>
           </div>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-green-600" />
+            <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+              <BookOpen className="h-6 w-6 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Students</p>
+              <p className="text-sm text-muted-foreground">Students</p>
               <p className="text-2xl font-bold">{users.filter(u => u.role === 'student').length}</p>
             </div>
           </div>
@@ -311,46 +311,46 @@ const UsersPage = () => {
       </div>
 
       {/* Users Table */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+      <div className="bg-card rounded-lg shadow-sm border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 border-b">
+            <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Email
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Assigned Groups
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-card divide-y divide-border">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">
                     No users found
                   </td>
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user._id} className="hover:bg-gray-50">
+                  <tr key={user._id} className="hover:bg-muted/50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="font-medium text-gray-900">{user.name}</div>
+                      <div className="font-medium">{user.name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{user.email}</div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getRoleBadgeColor(user.role)}`}>
@@ -369,7 +369,7 @@ const UsersPage = () => {
                                   {assignedGroups.map(group => (
                                     <span 
                                       key={group._id}
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium border border-purple-200"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium border border-purple-200 dark:border-purple-800"
                                     >
                                       <UsersRound className="h-3 w-3" />
                                       {group.name}
@@ -377,17 +377,17 @@ const UsersPage = () => {
                                   ))}
                                 </div>
                               ) : (
-                                <span className="text-gray-400 italic">No groups assigned</span>
+                                <span className="text-muted-foreground italic">No groups assigned</span>
                               )}
                             </div>
                           );
                         })()
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-muted-foreground">
                         {new Date(user.createdAt).toLocaleDateString()}
                       </div>
                     </td>

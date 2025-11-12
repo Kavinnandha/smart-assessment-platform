@@ -884,7 +884,7 @@ const TakeTestPage = () => {
     fileSize: number;
   }>) => {
     if (!attachments || attachments.length === 0) {
-      return <p className="text-lg font-medium text-gray-900 mb-2">{questionText}</p>;
+      return <p className="text-lg font-medium mb-2">{questionText}</p>;
     }
 
     // Check if question text contains attachment placeholders
@@ -895,7 +895,7 @@ const TakeTestPage = () => {
       // No placeholders found, display attachments at the end (backward compatibility)
       return (
         <>
-          <p className="text-lg font-medium text-gray-900 mb-2">{questionText}</p>
+          <p className="text-lg font-medium mb-2">{questionText}</p>
           <div className="mt-4 space-y-2">
             {attachments.map((attachment, idx) => renderAttachment(attachment, idx))}
           </div>
@@ -937,7 +937,7 @@ const TakeTestPage = () => {
     }
 
     return (
-      <div className="text-lg font-medium text-gray-900 mb-2">
+      <div className="text-lg font-medium mb-2">
         {parts.map((part, idx) => 
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
@@ -960,8 +960,8 @@ const TakeTestPage = () => {
             className="max-w-2xl rounded-lg border shadow-sm"
           />
         ) : (
-          <div className="flex items-center gap-2 p-3 bg-gray-50 border rounded-lg max-w-md">
-            <File className="w-5 h-5 text-gray-500 shrink-0" />
+          <div className="flex items-center gap-2 p-3 bg-muted/30 border rounded-lg max-w-md">
+            <File className="w-5 h-5 text-muted-foreground shrink-0" />
             <a 
               href={`${FILE_BASE_URL}${attachment.fileUrl}`}
               target="_blank"
@@ -970,7 +970,7 @@ const TakeTestPage = () => {
             >
               {attachment.fileName}
             </a>
-            <Download className="w-4 h-4 text-gray-400" />
+            <Download className="w-4 h-4 text-muted-foreground" />
           </div>
         )}
       </div>
@@ -980,8 +980,8 @@ const TakeTestPage = () => {
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto">
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-gray-600">Loading test details...</p>
+        <div className="bg-card p-6 rounded-lg shadow text-center">
+          <p className="text-muted-foreground">Loading test details...</p>
         </div>
       </div>
     );
@@ -990,8 +990,8 @@ const TakeTestPage = () => {
   if (!test) {
     return (
       <div className="max-w-5xl mx-auto">
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-red-600">Test not found</p>
+        <div className="bg-card p-6 rounded-lg shadow text-center">
+          <p className="text-red-600 dark:text-red-400">Test not found</p>
           <Button onClick={() => navigate('/tests')} className="mt-4">
             Back to Tests
           </Button>
@@ -1006,19 +1006,19 @@ const TakeTestPage = () => {
     if (alreadySubmitted) {
       return (
         <div className="max-w-4xl mx-auto">
-          <div className="bg-white p-8 rounded-lg shadow">
+          <div className="bg-card p-8 rounded-lg shadow">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-                <CheckCircle className="h-8 w-8 text-blue-600" />
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/30 mb-4">
+                <CheckCircle className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Test Already Submitted</h1>
-              <p className="text-lg text-gray-600 mb-6">
+              <h1 className="text-3xl font-bold mb-2">Test Already Submitted</h1>
+              <p className="text-lg text-muted-foreground mb-6">
                 You have already submitted this test. Only one attempt is allowed.
               </p>
               
-              <div className="bg-blue-50 p-6 rounded-lg mb-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-2">{test?.title}</h2>
-                <p className="text-gray-600">{test?.subject?.name || 'N/A'}</p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg mb-6">
+                <h2 className="text-xl font-semibold mb-2">{test?.title}</h2>
+                <p className="text-muted-foreground">{test?.subject?.name || 'N/A'}</p>
               </div>
 
               <div className="flex gap-4 justify-center">
@@ -1039,55 +1039,55 @@ const TakeTestPage = () => {
     if (!testStarted) {
       return (
         <div className="max-w-4xl mx-auto">
-          <div className="bg-white p-8 rounded-lg shadow">
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{test.title}</h1>
-            <p className="text-lg text-gray-600 mb-6">{test.subject?.name || 'N/A'}</p>
+          <div className="bg-card p-8 rounded-lg shadow">
+            <h1 className="text-3xl font-bold mb-4">{test.title}</h1>
+            <p className="text-lg text-muted-foreground mb-6">{test.subject?.name || 'N/A'}</p>
             
             {test.description && (
-              <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                <p className="text-gray-700">{test.description}</p>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
+                <p className="text-blue-900 dark:text-blue-300">{test.description}</p>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="flex items-center gap-2 text-gray-700">
-                <Clock className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <div>
-                  <p className="text-sm text-gray-500">Duration</p>
+                  <p className="text-sm text-muted-foreground">Duration</p>
                   <p className="font-semibold">{test.duration} minutes</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-700">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <div>
-                  <p className="text-sm text-gray-500">Questions</p>
+                  <p className="text-sm text-muted-foreground">Questions</p>
                   <p className="font-semibold">{test.questions.length}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-gray-700">
-                <FileText className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <div>
-                  <p className="text-sm text-gray-500">Total Marks</p>
+                  <p className="text-sm text-muted-foreground">Total Marks</p>
                   <p className="font-semibold">{test.totalMarks}</p>
                 </div>
               </div>
               {test.deadline && (
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Calendar className="h-5 w-5 text-red-600" />
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-red-600 dark:text-red-400" />
                   <div>
-                    <p className="text-sm text-gray-500">Deadline</p>
+                    <p className="text-sm text-muted-foreground">Deadline</p>
                     <p className="font-medium text-sm">{formatDate(test.deadline)}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6">
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 rounded-lg mb-6">
               <div className="flex gap-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="font-semibold text-yellow-900 mb-2">Important Instructions:</h3>
-                  <ul className="list-disc list-inside space-y-1 text-yellow-800 text-sm">
+                  <h3 className="font-semibold text-yellow-900 dark:text-yellow-300 mb-2">Important Instructions:</h3>
+                  <ul className="list-disc list-inside space-y-1 text-yellow-800 dark:text-yellow-400 text-sm">
                     <li>Once you start, the timer will begin automatically</li>
                     <li>You cannot pause or restart the test</li>
                     <li>All answers are auto-saved as you type</li>
@@ -1300,7 +1300,7 @@ const TakeTestPage = () => {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="outline"
-                className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export Test
@@ -1334,7 +1334,7 @@ const TakeTestPage = () => {
           <Button
             variant="outline"
             onClick={() => navigate(`/tests/edit/${test._id}`)}
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
           >
             <Edit className="h-4 w-4 mr-2" />
             Edit Test
@@ -1344,7 +1344,7 @@ const TakeTestPage = () => {
             <Button
               variant="outline"
               onClick={handleUnpublish}
-              className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+              className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20"
             >
               <EyeOff className="h-4 w-4 mr-2" />
               Unpublish
@@ -1362,57 +1362,57 @@ const TakeTestPage = () => {
       </div>
 
       {/* Test Header */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
+      <div className="bg-card p-6 rounded-lg shadow mb-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold mb-2">
               {test.title}
             </h1>
-            <p className="text-lg text-gray-600">{test.subject?.name || 'N/A'}</p>
+            <p className="text-lg text-muted-foreground">{test.subject?.name || 'N/A'}</p>
           </div>
           {test.isPublished ? (
-            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+            <span className="px-3 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-full text-sm font-medium">
               Published
             </span>
           ) : (
-            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+            <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded-full text-sm font-medium">
               Draft
             </span>
           )}
         </div>
 
         {test.description && (
-          <p className="text-gray-700 mb-4 p-4 bg-gray-50 rounded-lg">
+          <p className="mb-4 p-4 bg-muted/30 rounded-lg">
             {test.description}
           </p>
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-2 text-gray-700">
-            <Clock className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <p className="text-xs text-gray-500">Duration</p>
+              <p className="text-xs text-muted-foreground">Duration</p>
               <p className="font-semibold">{test.duration} minutes</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <p className="text-xs text-gray-500">Questions</p>
+              <p className="text-xs text-muted-foreground">Questions</p>
               <p className="font-semibold">{test.questions.length}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <FileText className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <p className="text-xs text-gray-500">Total Marks</p>
+              <p className="text-xs text-muted-foreground">Total Marks</p>
               <p className="font-semibold">{test.totalMarks}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-gray-700">
-            <Users className="h-5 w-5 text-blue-600" />
+          <div className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             <div>
-              <p className="text-xs text-gray-500">Assigned To</p>
+              <p className="text-xs text-muted-foreground">Assigned To</p>
               <p className="font-semibold">{test.assignedTo.length} students</p>
             </div>
           </div>
@@ -1421,19 +1421,19 @@ const TakeTestPage = () => {
         {(test.scheduledDate || test.deadline) && (
           <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
             {test.scheduledDate && (
-              <div className="flex items-center gap-2 text-gray-700">
-                <Calendar className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 <div>
-                  <p className="text-xs text-gray-500">Scheduled Date</p>
+                  <p className="text-xs text-muted-foreground">Scheduled Date</p>
                   <p className="font-medium text-sm">{formatDate(test.scheduledDate)}</p>
                 </div>
               </div>
             )}
             {test.deadline && (
-              <div className="flex items-center gap-2 text-gray-700">
-                <Calendar className="h-5 w-5 text-red-600" />
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-red-600 dark:text-red-400" />
                 <div>
-                  <p className="text-xs text-gray-500">Deadline</p>
+                  <p className="text-xs text-muted-foreground">Deadline</p>
                   <p className="font-medium text-sm">{formatDate(test.deadline)}</p>
                 </div>
               </div>
@@ -1442,7 +1442,7 @@ const TakeTestPage = () => {
         )}
 
         <div className="mt-4 pt-4 border-t">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Created by <span className="font-medium">{test.createdBy.name}</span> on{' '}
             {formatDate(test.createdAt)}
           </p>
@@ -1450,23 +1450,23 @@ const TakeTestPage = () => {
       </div>
 
       {/* Questions List */}
-      <div className="bg-white p-6 rounded-lg shadow mb-6">
+      <div className="bg-card p-6 rounded-lg shadow mb-6">
         <h2 className="text-xl font-semibold mb-4">Questions ({test.questions.length})</h2>
         <div className="space-y-4">
           {test.questions
             .sort((a, b) => a.order - b.order)
             .map((item, index) => (
-              <div key={item._id} className="border rounded-lg p-4 hover:bg-gray-50">
+              <div key={item._id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
                 <div className="flex items-start gap-4">
                   <div className="shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold">
                       {index + 1}
                     </div>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           Q{index + 1}
                         </p>
                         <div className="mt-1">
@@ -1481,11 +1481,11 @@ const TakeTestPage = () => {
                           />
                         )}
                       </div>
-                      <span className="ml-4 px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm font-medium shrink-0">
+                      <span className="ml-4 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded text-sm font-medium shrink-0">
                         {item.marks} marks
                       </span>
                     </div>
-                    <div className="flex gap-4 text-sm text-gray-600 mt-2">
+                    <div className="flex gap-4 text-sm text-muted-foreground mt-2">
                       <span>Chapter: {item.question.chapter}</span>
                       {item.question.topic && (
                         <span>Topic: {item.question.topic}</span>
@@ -1493,10 +1493,10 @@ const TakeTestPage = () => {
                       <span
                         className={`px-2 py-0.5 rounded-full text-xs ${
                           item.question.difficultyLevel === 'easy'
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
                             : item.question.difficultyLevel === 'medium'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
+                            ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                            : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                         }`}
                       >
                         {item.question.difficultyLevel}
@@ -1510,12 +1510,12 @@ const TakeTestPage = () => {
       </div>
 
       {/* Assigned Students */}
-      <div className="bg-white p-6 rounded-lg shadow">
+      <div className="bg-card p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">
           Assigned Students ({test.assignedTo.length})
         </h2>
         {test.assignedTo.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">
+          <p className="text-muted-foreground text-center py-4">
             No students assigned to this test
           </p>
         ) : (
@@ -1523,16 +1523,16 @@ const TakeTestPage = () => {
             {test.assignedTo.map((student) => (
               <div
                 key={student._id}
-                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50"
+                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors"
               >
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold">
+                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold">
                   {student.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">
+                  <p className="font-medium truncate">
                     {student.name}
                   </p>
-                  <p className="text-sm text-gray-600 truncate">{student.email}</p>
+                  <p className="text-sm text-muted-foreground truncate">{student.email}</p>
                 </div>
               </div>
             ))}

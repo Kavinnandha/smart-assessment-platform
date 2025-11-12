@@ -222,8 +222,8 @@ export default function StudentGroupsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2 text-gray-600">Loading groups...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">Loading groups...</p>
         </div>
       </div>
     );
@@ -234,7 +234,7 @@ export default function StudentGroupsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Student Groups</h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-muted-foreground mt-1">
             {isAdmin ? 'Organize students into groups for easier management' : 'View groups assigned to you'}
           </p>
         </div>
@@ -247,7 +247,7 @@ export default function StudentGroupsPage() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg shadow-sm border">
         <Input
           placeholder="Search groups..."
           value={searchTerm}
@@ -259,17 +259,17 @@ export default function StudentGroupsPage() {
       {/* Groups Grid - Card View */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredGroups.length === 0 ? (
-          <div className="col-span-full bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500">
+          <div className="col-span-full bg-card p-8 rounded-lg shadow-sm border text-center text-muted-foreground">
             No groups found
           </div>
         ) : (
           filteredGroups.map((group) => (
-            <div key={group._id} className="bg-white rounded-lg shadow-md border hover:shadow-lg transition-shadow">
+            <div key={group._id} className="bg-card rounded-lg shadow-md border hover:shadow-lg transition-shadow">
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <UsersRound className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                      <UsersRound className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
                   </div>
                   {isAdmin && (
@@ -280,7 +280,7 @@ export default function StudentGroupsPage() {
                         onClick={() => handleOpenGroupDialog(group)}
                         className="h-8 w-8 p-0"
                       >
-                        <Edit className="h-4 w-4 text-gray-600" />
+                        <Edit className="h-4 w-4 text-muted-foreground" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -296,11 +296,11 @@ export default function StudentGroupsPage() {
                 
                 <h3 className="font-bold text-xl mb-2">{group.name}</h3>
                 {group.description && (
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{group.description}</p>
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{group.description}</p>
                 )}
                 
                 <div className="mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
                     <BookOpen className="h-3 w-3" />
                     {group.subject.name}
                   </span>
@@ -308,24 +308,24 @@ export default function StudentGroupsPage() {
                 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Students</span>
+                    <span className="text-muted-foreground">Students</span>
                     <span className="font-semibold text-lg">{group.students.length}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Teachers</span>
+                    <span className="text-muted-foreground">Teachers</span>
                     <span className="font-semibold text-lg">{group.teachers?.length || 0}</span>
                   </div>
                 </div>
 
                 {group.teachers && group.teachers.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                    <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                       <GraduationCap className="h-3 w-3" />
                       Assigned Teachers:
                     </p>
                     <div className="space-y-1 max-h-20 overflow-y-auto">
                       {group.teachers.map((teacher) => (
-                        <div key={teacher._id} className="text-sm text-blue-700 font-medium">
+                        <div key={teacher._id} className="text-sm text-blue-700 dark:text-blue-400 font-medium">
                           • {teacher.name}
                         </div>
                       ))}
@@ -335,15 +335,15 @@ export default function StudentGroupsPage() {
 
                 {group.students.length > 0 && (
                   <div className="mt-4 pt-4 border-t">
-                    <p className="text-xs text-gray-500 mb-2">Students in group:</p>
+                    <p className="text-xs text-muted-foreground mb-2">Students in group:</p>
                     <div className="space-y-1 max-h-32 overflow-y-auto">
                       {group.students.slice(0, 3).map((student) => (
-                        <div key={student._id} className="text-sm text-gray-700">
+                        <div key={student._id} className="text-sm">
                           • {student.name}
                         </div>
                       ))}
                       {group.students.length > 3 && (
-                        <div className="text-sm text-gray-500 italic">
+                        <div className="text-sm text-muted-foreground italic">
                           + {group.students.length - 3} more...
                         </div>
                       )}
@@ -408,30 +408,30 @@ export default function StudentGroupsPage() {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">Select the subject for this group</p>
+              <p className="text-xs text-muted-foreground mt-1">Select the subject for this group</p>
             </div>
 
             <div>
               <Label>Students ({formData.students.length} selected)</Label>
               <div className="mt-2 border rounded-md p-4 max-h-64 overflow-y-auto space-y-2">
                 {students.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">No students available</p>
+                  <p className="text-sm text-muted-foreground italic">No students available</p>
                 ) : (
                   students.map((student) => (
                     <div
                       key={student._id}
-                      className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
+                      className="flex items-center gap-3 p-2 hover:bg-muted/30 rounded cursor-pointer"
                       onClick={() => handleToggleStudent(student._id)}
                     >
                       <input
                         type="checkbox"
                         checked={formData.students.includes(student._id)}
                         onChange={() => handleToggleStudent(student._id)}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-4 w-4 rounded border"
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.email}</p>
+                        <p className="text-xs text-muted-foreground">{student.email}</p>
                       </div>
                     </div>
                   ))
@@ -443,26 +443,26 @@ export default function StudentGroupsPage() {
               <Label>Assigned Teachers ({formData.teachers.length} selected)</Label>
               <div className="mt-2 border rounded-md p-4 max-h-64 overflow-y-auto space-y-2">
                 {teachers.length === 0 ? (
-                  <p className="text-sm text-gray-500 italic">No teachers available</p>
+                  <p className="text-sm text-muted-foreground italic">No teachers available</p>
                 ) : (
                   teachers.map((teacher) => (
                     <div
                       key={teacher._id}
-                      className="flex items-center gap-3 p-2 hover:bg-blue-50 rounded cursor-pointer"
+                      className="flex items-center gap-3 p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded cursor-pointer"
                       onClick={() => handleToggleTeacher(teacher._id)}
                     >
                       <input
                         type="checkbox"
                         checked={formData.teachers.includes(teacher._id)}
                         onChange={() => handleToggleTeacher(teacher._id)}
-                        className="h-4 w-4 rounded border-gray-300"
+                        className="h-4 w-4 rounded border"
                       />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <GraduationCap className="h-4 w-4 text-blue-600" />
+                          <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                           <p className="text-sm font-medium">{teacher.name}</p>
                         </div>
-                        <p className="text-xs text-gray-500 ml-6">{teacher.email}</p>
+                        <p className="text-xs text-muted-foreground ml-6">{teacher.email}</p>
                       </div>
                     </div>
                   ))
@@ -497,9 +497,9 @@ export default function StudentGroupsPage() {
             </DialogDescription>
           </DialogHeader>
           {deletingGroup && (
-            <div className="bg-gray-50 p-4 rounded-md">
+            <div className="bg-muted/30 p-4 rounded-md">
               <p className="font-medium">{deletingGroup.name}</p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 {deletingGroup.students.length} student{deletingGroup.students.length !== 1 ? 's' : ''}
               </p>
             </div>

@@ -47,11 +47,11 @@ function ChapterFormItem({
   const [newTopicInput, setNewTopicInput] = useState('');
 
   return (
-    <div className="border rounded-md p-3 bg-gray-50">
+    <div className="border rounded-md p-3 bg-muted/30">
       {/* Chapter header */}
       <div className="flex items-center gap-2 mb-2">
         <span className="flex-1 font-medium text-sm">{chapter.name}</span>
-        <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
+        <span className="text-xs text-muted-foreground bg-card px-2 py-0.5 rounded">
           {chapter.topics.length} topics
         </span>
         <Button
@@ -69,7 +69,7 @@ function ChapterFormItem({
       {chapter.topics.length > 0 && (
         <div className="space-y-1 mb-2">
           {chapter.topics.map((topic, topicIndex) => (
-            <div key={topicIndex} className="flex items-center gap-2 bg-white p-1.5 rounded text-sm">
+            <div key={topicIndex} className="flex items-center gap-2 bg-card p-1.5 rounded text-sm border">
               <span className="flex-1">{topic}</span>
               <Button
                 type="button"
@@ -396,8 +396,8 @@ export default function SubjectsPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-          <p className="mt-2 text-gray-600">Loading subjects...</p>
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-2 text-muted-foreground">Loading subjects...</p>
         </div>
       </div>
     );
@@ -408,7 +408,7 @@ export default function SubjectsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Subjects, Chapters & Topics</h1>
-          <p className="text-gray-600 mt-1">Manage subjects, chapters, and their topics</p>
+          <p className="text-muted-foreground mt-1">Manage subjects, chapters, and their topics</p>
         </div>
         <Button onClick={() => handleOpenSubjectDialog()} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -417,7 +417,7 @@ export default function SubjectsPage() {
       </div>
 
       {/* Search Bar */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg shadow-sm border">
         <Input
           placeholder="Search subjects..."
           value={searchTerm}
@@ -429,18 +429,18 @@ export default function SubjectsPage() {
       {/* Subjects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredSubjects.length === 0 ? (
-          <div className="col-span-full bg-white p-8 rounded-lg shadow-sm border text-center text-gray-500">
+          <div className="col-span-full bg-card p-8 rounded-lg shadow-sm border text-center text-muted-foreground">
             No subjects found
           </div>
         ) : (
           filteredSubjects.map((subject) => (
-            <div key={subject._id} className="bg-white rounded-lg shadow-md border hover:shadow-lg transition-shadow">
+            <div key={subject._id} className="bg-card rounded-lg shadow-md border hover:shadow-lg transition-shadow">
               {/* Subject Card Header */}
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
+                    <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+                      <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
                   </div>
                   <div className="flex gap-1">
@@ -450,13 +450,13 @@ export default function SubjectsPage() {
                       onClick={() => handleOpenSubjectDialog(subject)}
                       className="h-8 w-8 p-0"
                     >
-                      <Edit className="h-4 w-4 text-gray-600" />
+                      <Edit className="h-4 w-4 text-muted-foreground" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleOpenDeleteDialog(subject)}
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -464,7 +464,7 @@ export default function SubjectsPage() {
                 </div>
                 
                 <h3 className="font-bold text-xl mb-2">{subject.name}</h3>
-                <div className="flex gap-3 text-sm text-gray-600 mb-4">
+                <div className="flex gap-3 text-sm text-muted-foreground mb-4">
                   <span>{subject.chapters.length} chapter{subject.chapters.length !== 1 ? 's' : ''}</span>
                   <span>•</span>
                   <span>
@@ -485,8 +485,8 @@ export default function SubjectsPage() {
 
               {/* Chapters List (Expandable) */}
               {expandedSubject === subject._id && (
-                <div className="border-t px-5 py-4 bg-gray-50">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm text-gray-700">
+                <div className="border-t px-5 py-4 bg-muted/30">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2 text-sm">
                     <FolderOpen className="h-4 w-4" />
                     Chapters
                   </h4>
@@ -494,10 +494,10 @@ export default function SubjectsPage() {
                   {/* Existing Chapters */}
                   <div className="space-y-2 mb-3 max-h-96 overflow-y-auto">
                     {subject.chapters.length === 0 ? (
-                      <p className="text-sm text-gray-500 italic">No chapters yet</p>
+                      <p className="text-sm text-muted-foreground italic">No chapters yet</p>
                     ) : (
                       subject.chapters.map((chapter, chapterIndex) => (
-                        <div key={chapterIndex} className="border rounded-md bg-white">
+                        <div key={chapterIndex} className="border rounded-md bg-card">
                           <div className="flex items-center gap-2 p-2.5">
                             {editingChapterIndex === chapterIndex ? (
                               <>
@@ -532,7 +532,7 @@ export default function SubjectsPage() {
                                 <div className="flex-1">
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium">{chapter.name}</span>
-                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
                                       {chapter.topics.length} topic{chapter.topics.length !== 1 ? 's' : ''}
                                     </span>
                                   </div>
@@ -569,18 +569,18 @@ export default function SubjectsPage() {
                           {/* Topics List (Nested Expandable) */}
                           {expandedChapter?.subjectId === subject._id && 
                            expandedChapter?.chapterIndex === chapterIndex && (
-                            <div className="border-t bg-gray-50 p-3">
-                              <h5 className="font-medium mb-2 text-xs text-gray-700 flex items-center gap-1">
+                            <div className="border-t bg-muted/30 p-3">
+                              <h5 className="font-medium mb-2 text-xs flex items-center gap-1">
                                 <List className="h-3 w-3" />
                                 Topics
                               </h5>
                               
                               <div className="space-y-1.5 mb-2 max-h-40 overflow-y-auto">
                                 {chapter.topics.length === 0 ? (
-                                  <p className="text-xs text-gray-500 italic">No topics yet</p>
+                                  <p className="text-xs text-muted-foreground italic">No topics yet</p>
                                 ) : (
                                   chapter.topics.map((topic, topicIndex) => (
-                                    <div key={topicIndex} className="flex items-center gap-1.5 bg-white p-1.5 rounded text-xs border">
+                                    <div key={topicIndex} className="flex items-center gap-1.5 bg-card p-1.5 rounded text-xs border">
                                       {editingTopic?.chapterIndex === chapterIndex && 
                                        editingTopic?.topicIndex === topicIndex ? (
                                         <>
@@ -733,7 +733,7 @@ export default function SubjectsPage() {
                   />
                 ))}
                 {formData.chapters.length === 0 && (
-                  <p className="text-sm text-gray-500 italic">No chapters added yet</p>
+                  <p className="text-sm text-muted-foreground italic">No chapters added yet</p>
                 )}
               </div>
               
@@ -787,9 +787,9 @@ export default function SubjectsPage() {
             </DialogDescription>
           </DialogHeader>
           {deletingSubject && (
-            <div className="bg-gray-50 p-4 rounded-md">
+            <div className="bg-muted/30 p-4 rounded-md">
               <p className="font-medium">{deletingSubject.name}</p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 {deletingSubject.chapters.length} chapter{deletingSubject.chapters.length !== 1 ? 's' : ''} • {' '}
                 {deletingSubject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0)} topic{deletingSubject.chapters.reduce((sum, ch) => sum + ch.topics.length, 0) !== 1 ? 's' : ''}
               </p>

@@ -471,9 +471,9 @@ const CreateTestPage = () => {
             className="max-w-2xl rounded-lg border shadow-sm"
           />
         ) : (
-          <div className="flex items-center gap-2 p-3 bg-gray-50 border rounded-lg max-w-md">
+          <div className="flex items-center gap-2 p-3 bg-muted/30 border rounded-lg max-w-md">
             <span className="text-sm font-medium">{attachment.fileName}</span>
-            <span className="text-xs text-gray-600">({(attachment.fileSize / 1024).toFixed(1)} KB)</span>
+            <span className="text-xs text-muted-foreground">({(attachment.fileSize / 1024).toFixed(1)} KB)</span>
           </div>
         )}
       </div>
@@ -694,66 +694,67 @@ const CreateTestPage = () => {
   if (initialLoading) {
     return (
       <div className="max-w-7xl mx-auto">
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-gray-600">Loading test details...</p>
+        <div className="bg-card p-6 rounded-lg shadow text-center">
+          <p className="text-muted-foreground">Loading test details...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">
-        {isEditMode ? 'Edit Test' : 'Create Test'}
-      </h1>
+    <div className="w-full">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
+          {isEditMode ? 'Edit Test' : 'Create Test'}
+        </h1>
 
-      {/* Tab Navigation */}
-      <div className="mb-4 sm:mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex gap-3 sm:gap-6 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setCurrentStep(1)}
-              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                currentStep === 1
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Test Information
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(2)}
-              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                currentStep === 2
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Student Assignment
-            </button>
-            <button
-              type="button"
-              onClick={() => setCurrentStep(3)}
-              className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                currentStep === 3
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Questions
-            </button>
-          </nav>
+        {/* Tab Navigation */}
+        <div className="mb-4 sm:mb-6">
+          <div className="border-b">
+            <nav className="-mb-px flex gap-3 sm:gap-6 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(1)}
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                  currentStep === 1
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                Test Information
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                  currentStep === 2
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                Student Assignment
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentStep(3)}
+                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
+                  currentStep === 3
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                }`}
+              >
+                Questions
+              </button>
+            </nav>
+          </div>
         </div>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+        <form onSubmit={handleSubmit} className="w-full space-y-4 sm:space-y-6">
         {/* Step 1: Test Information */}
         {currentStep === 1 && (
           <>
             {/* Basic Information */}
-            <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+            <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
               <h2 className="text-lg sm:text-xl font-semibold mb-4">Test Information</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
@@ -778,7 +779,7 @@ const CreateTestPage = () => {
                       setFilters({ ...filters, subject: e.target.value, chapter: '' });
                     }}
                     required
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-base"
+                    className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-base"
                   >
                     <option value="">Select Subject</option>
                     {subjects.map((subject) => (
@@ -872,135 +873,137 @@ const CreateTestPage = () => {
 
         {/* Step 2: Student Assignment */}
         {currentStep === 2 && (
-          <>
+          <div className="w-full space-y-4 sm:space-y-6">
             {/* Student Assignment */}
-            <div className="bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold mb-4">Assign to Students</h2>
+            <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
+              <h2 className="text-lg sm:text-xl font-semibold mb-4">Assign to Students</h2>
               
-              {/* Assignment Type Selector */}
-              <div className="mb-4">
-                <Label className="mb-2 block">Assignment Type</Label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="assignmentType"
-                      value="group"
-                      checked={assignmentType === 'group'}
-                      onChange={(e) => setAssignmentType(e.target.value as 'group')}
-                      className="h-4 w-4"
-                    />
-                    <span>Assign to Group</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="assignmentType"
-                      value="individual"
-                      checked={assignmentType === 'individual'}
-                      onChange={(e) => setAssignmentType(e.target.value as 'individual')}
-                      className="h-4 w-4"
-                    />
-                    <span>Assign to Individual Students</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Group Selection */}
-              {assignmentType === 'group' && (
+              <div className="grid grid-cols-1 gap-4">
+                {/* Assignment Type Selector */}
                 <div>
-                  <Label htmlFor="group">Select Group *</Label>
-                  <select
-                    id="group"
-                    value={selectedGroup}
-                    onChange={(e) => setSelectedGroup(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm mb-3"
-                  >
-                    <option value="">Select a Group</option>
-                    {groups.map((group) => (
-                      <option key={group._id} value={group._id}>
-                        {group.name} ({group.students.length} students)
-                      </option>
-                    ))}
-                  </select>
-
-                  {selectedGroup && (
-                    <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-                      <p className="text-sm font-semibold mb-2">Selected Group Students:</p>
-                      <div className="max-h-48 overflow-y-auto">
-                        {groups.find(g => g._id === selectedGroup)?.students.map((student) => (
-                          <div key={student._id} className="text-sm py-1 flex items-center gap-2">
-                            <span className="w-2 h-2 bg-blue-600 rounded-full"></span>
-                            <span>{student.name}</span>
-                            <span className="text-gray-600">({student.email})</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-sm font-medium mt-2 text-blue-700">
-                        Total: {groups.find(g => g._id === selectedGroup)?.students.length} students
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Individual Student Selection */}
-              {assignmentType === 'individual' && (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={selectAllStudents}
-                      >
-                        Select All
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={deselectAllStudents}
-                      >
-                        Deselect All
-                      </Button>
-                    </div>
+                  <Label className="mb-2 block">Assignment Type</Label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="assignmentType"
+                        value="group"
+                        checked={assignmentType === 'group'}
+                        onChange={(e) => setAssignmentType(e.target.value as 'group')}
+                        className="h-4 w-4"
+                      />
+                      <span>Assign to Group</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="assignmentType"
+                        value="individual"
+                        checked={assignmentType === 'individual'}
+                        onChange={(e) => setAssignmentType(e.target.value as 'individual')}
+                        className="h-4 w-4"
+                      />
+                      <span>Assign to Individual Students</span>
+                    </label>
                   </div>
+                </div>
 
-                  <p className="text-sm text-gray-600 mb-4">
-                    Selected: <span className="font-semibold">{selectedStudents.length}</span> / {students.length} students
-                  </p>
+                {/* Group Selection */}
+                {assignmentType === 'group' && (
+                  <div>
+                    <Label htmlFor="group">Select Group *</Label>
+                    <select
+                      id="group"
+                      value={selectedGroup}
+                      onChange={(e) => setSelectedGroup(e.target.value)}
+                      className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm mb-3"
+                    >
+                      <option value="">Select a Group</option>
+                      {groups.map((group) => (
+                        <option key={group._id} value={group._id}>
+                          {group.name} ({group.students.length} students)
+                        </option>
+                      ))}
+                    </select>
 
-                  <div className="max-h-64 overflow-y-auto border rounded-lg">
-                    {students.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No students found in the system
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-200">
-                        {students.map((student) => (
-                          <label
-                            key={student._id}
-                            className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={selectedStudents.includes(student._id)}
-                              onChange={() => toggleStudent(student._id)}
-                              className="h-4 w-4 rounded border-gray-300"
-                            />
-                            <div className="flex-1">
-                              <p className="font-medium">{student.name}</p>
-                              <p className="text-sm text-gray-600">{student.email}</p>
+                    {selectedGroup && (
+                      <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm font-semibold mb-2">Selected Group Students:</p>
+                        <div className="max-h-48 overflow-y-auto">
+                          {groups.find(g => g._id === selectedGroup)?.students.map((student) => (
+                            <div key={student._id} className="text-sm py-1 flex items-center gap-2">
+                              <span className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></span>
+                              <span>{student.name}</span>
+                              <span className="text-muted-foreground">({student.email})</span>
                             </div>
-                          </label>
-                        ))}
+                          ))}
+                        </div>
+                        <p className="text-sm font-medium mt-2 text-blue-700 dark:text-blue-400">
+                          Total: {groups.find(g => g._id === selectedGroup)?.students.length} students
+                        </p>
                       </div>
                     )}
                   </div>
-                </>
-              )}
+                )}
+
+                {/* Individual Student Selection */}
+                {assignmentType === 'individual' && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={selectAllStudents}
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={deselectAllStudents}
+                        >
+                          Deselect All
+                        </Button>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Selected: <span className="font-semibold">{selectedStudents.length}</span> / {students.length} students
+                    </p>
+
+                    <div className="max-h-64 overflow-y-auto border rounded-lg">
+                      {students.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No students found in the system
+                        </div>
+                      ) : (
+                        <div className="divide-y">
+                          {students.map((student) => (
+                            <label
+                              key={student._id}
+                              className="flex items-center gap-3 p-3 hover:bg-muted/30 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedStudents.includes(student._id)}
+                                onChange={() => toggleStudent(student._id)}
+                                className="h-4 w-4 rounded"
+                              />
+                              <div className="flex-1">
+                                <p className="font-medium">{student.name}</p>
+                                <p className="text-sm text-muted-foreground">{student.email}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Action Buttons */}
@@ -1013,14 +1016,14 @@ const CreateTestPage = () => {
                 Cancel
               </Button>
             </div>
-          </>
+          </div>
         )}
 
         {/* Step 3: Question Selection */}
         {currentStep === 3 && (
           <>
             {/* Question Selection Mode */}
-            <div className="bg-white p-6 rounded-lg shadow">
+            <div className="bg-card p-6 rounded-lg shadow">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">Questions</h2>
                 <div className="flex gap-2">
@@ -1044,18 +1047,18 @@ const CreateTestPage = () => {
 
               {/* Auto Generate Mode */}
               {mode === 'auto' && (
-                <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-gray-700">
+                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-sm">
                     Automatically select questions based on difficulty distribution
                   </p>
 
                   {/* Chapter Selection */}
                   <div>
                     <Label className="mb-2 block">Select Chapters (Optional)</Label>
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Leave empty to include all chapters, or select specific chapters
                     </p>
-                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-white p-3">
+                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-background p-3">
                       {formData.subject ? (
                         (() => {
                           const selectedSubject = subjects.find(s => s._id === formData.subject);
@@ -1064,7 +1067,7 @@ const CreateTestPage = () => {
                               {selectedSubject.chapters.map((chapter, index) => (
                                 <label
                                   key={index}
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
                                 >
                                   <input
                                     type="checkbox"
@@ -1089,20 +1092,20 @@ const CreateTestPage = () => {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-sm text-gray-500 text-center py-2">
+                            <p className="text-sm text-muted-foreground text-center py-2">
                               No chapters available for this subject
                             </p>
                           );
                         })()
                       ) : (
-                        <p className="text-sm text-gray-500 text-center py-2">
+                        <p className="text-sm text-muted-foreground text-center py-2">
                           Please select a subject first
                         </p>
                       )}
                     </div>
                     {autoGenSettings.chapters.length > 0 && (
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-muted-foreground">
                           {autoGenSettings.chapters.length} chapter(s) selected
                         </p>
                         <Button
@@ -1120,10 +1123,10 @@ const CreateTestPage = () => {
                   {/* Topic Selection */}
                   <div>
                     <Label className="mb-2 block">Select Topics (Optional)</Label>
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Select specific topics from the chosen chapters
                     </p>
-                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-white p-3">
+                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-background p-3">
                       {(() => {
                         const availableTopics = getAvailableTopics();
                         return availableTopics.length > 0 ? (
@@ -1131,7 +1134,7 @@ const CreateTestPage = () => {
                             {availableTopics.map((topic, index) => (
                               <label
                                 key={index}
-                                className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                                className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
                               >
                                 <input
                                   type="checkbox"
@@ -1156,7 +1159,7 @@ const CreateTestPage = () => {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-500 text-center py-2">
+                          <p className="text-sm text-muted-foreground text-center py-2">
                             {formData.subject ? 'No topics available for selected chapters' : 'Please select a subject and chapters first'}
                           </p>
                         );
@@ -1164,7 +1167,7 @@ const CreateTestPage = () => {
                     </div>
                     {autoGenSettings.topics.length > 0 && (
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-muted-foreground">
                           {autoGenSettings.topics.length} topic(s) selected
                         </p>
                         <Button
@@ -1182,14 +1185,14 @@ const CreateTestPage = () => {
                   {/* Question Type Selection */}
                   <div>
                     <Label className="mb-2 block">Select Question Types (Optional)</Label>
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Choose specific question types to include
                     </p>
-                    <div className="grid grid-cols-2 gap-2 border rounded-lg bg-white p-3">
+                    <div className="grid grid-cols-2 gap-2 border rounded-lg bg-background p-3">
                       {getAvailableQuestionTypes().map((type, index) => (
                         <label
                           key={index}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
                         >
                           <input
                             type="checkbox"
@@ -1215,7 +1218,7 @@ const CreateTestPage = () => {
                     </div>
                     {autoGenSettings.questionTypes.length > 0 && (
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-muted-foreground">
                           {autoGenSettings.questionTypes.length} question type(s) selected
                         </p>
                         <Button
@@ -1233,14 +1236,14 @@ const CreateTestPage = () => {
                   {/* Specific Marks Selection */}
                   <div>
                     <Label className="mb-2 block">Select Specific Mark Values (Optional)</Label>
-                    <p className="text-xs text-gray-600 mb-2">
+                    <p className="text-xs text-muted-foreground mb-2">
                       Choose specific mark values for questions (leave empty for any marks)
                     </p>
-                    <div className="grid grid-cols-6 gap-2 border rounded-lg bg-white p-3">
+                    <div className="grid grid-cols-6 gap-2 border rounded-lg bg-background p-3">
                       {getCommonMarkValues().map((marks, index) => (
                         <label
                           key={index}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
                         >
                           <input
                             type="checkbox"
@@ -1266,7 +1269,7 @@ const CreateTestPage = () => {
                     </div>
                     {autoGenSettings.specificMarks.length > 0 && (
                       <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-muted-foreground">
                           {autoGenSettings.specificMarks.length} mark value(s) selected: {autoGenSettings.specificMarks.join(', ')}
                         </p>
                         <Button
@@ -1333,9 +1336,9 @@ const CreateTestPage = () => {
                     autoGenSettings.topics.length > 0 || 
                     autoGenSettings.questionTypes.length > 0 || 
                     autoGenSettings.specificMarks.length > 0) && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <h4 className="text-sm font-medium text-blue-800 mb-2">Selection Summary</h4>
-                      <div className="space-y-1 text-xs text-blue-700">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Selection Summary</h4>
+                      <div className="space-y-1 text-xs text-blue-700 dark:text-blue-400">
                         {autoGenSettings.chapters.length > 0 && (
                           <p><span className="font-medium">Chapters:</span> {autoGenSettings.chapters.join(', ')}</p>
                         )}
@@ -1361,7 +1364,7 @@ const CreateTestPage = () => {
                             questionTypes: [],
                             specificMarks: []
                           })}
-                          className="text-blue-700 border-blue-300 hover:bg-blue-100"
+                          className="text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
                         >
                           Clear All Filters
                         </Button>
@@ -1384,7 +1387,7 @@ const CreateTestPage = () => {
               {mode === 'manual' && (
                 <div className="space-y-4">
                   {/* Filters */}
-                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
                     {/* Search and basic filters */}
                     <div className="grid grid-cols-4 gap-4">
                       <div>
@@ -1402,7 +1405,7 @@ const CreateTestPage = () => {
                           id="chapter-filter"
                           value={filters.chapter}
                           onChange={(e) => setFilters({ ...filters, chapter: e.target.value })}
-                          className="flex h-10 w-full rounded-md border px-3 py-2"
+                          className="flex h-10 w-full rounded-md border bg-background px-3 py-2"
                           disabled={!formData.subject}
                         >
                           <option value="">All Chapters</option>
@@ -1421,7 +1424,7 @@ const CreateTestPage = () => {
                           id="difficulty-filter"
                           value={filters.difficulty}
                           onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
-                          className="flex h-10 w-full rounded-md border px-3 py-2"
+                          className="flex h-10 w-full rounded-md border bg-background px-3 py-2"
                         >
                           <option value="">All Difficulties</option>
                           <option value="easy">Easy</option>
@@ -1497,7 +1500,7 @@ const CreateTestPage = () => {
                     
                     {/* Filter status message */}
                     {(filters.minMarks || filters.maxMarks) && (
-                      <div className="mt-2 text-sm text-blue-600">
+                      <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
                         {filters.minMarks && filters.maxMarks 
                           ? `Showing questions with ${filters.minMarks}-${filters.maxMarks} marks`
                           : filters.minMarks 
@@ -1511,28 +1514,28 @@ const CreateTestPage = () => {
                   {/* Available Questions */}
                   {formData.subject && (
                     <div className="max-h-96 overflow-y-auto border rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50 sticky top-0">
+                      <table className="min-w-full divide-y divide-border">
+                        <thead className="bg-muted/30 sticky top-0">
                           <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Q.No</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Question</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Chapter</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Difficulty</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Marks</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">View</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Action</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Q.No</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Question</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Chapter</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Difficulty</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Marks</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">View</th>
+                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Action</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-card divide-y divide-border">
                           {questions.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="px-4 py-4 text-center text-gray-500">
+                              <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
                                 No questions available. Please adjust filters or add questions to the bank.
                               </td>
                             </tr>
                           ) : (
                             questions.map((q, idx) => (
-                              <tr key={q._id} className="hover:bg-gray-50">
+                              <tr key={q._id} className="hover:bg-muted/30 transition-colors">
                                 <td className="px-4 py-3">{`Q${idx + 1}`}</td>
                                 <td className="px-4 py-3 max-w-md truncate">{q.questionText}</td>
                                 <td className="px-4 py-3">{q.chapter}</td>
@@ -1540,10 +1543,10 @@ const CreateTestPage = () => {
                                   <span
                                     className={`px-2 py-1 rounded-full text-xs ${
                                       q.difficultyLevel === 'easy'
-                                        ? 'bg-green-100 text-green-800'
+                                        ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
                                         : q.difficultyLevel === 'medium'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : 'bg-red-100 text-red-800'
+                                        ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                        : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                                     }`}
                                   >
                                     {q.difficultyLevel}
@@ -1556,7 +1559,7 @@ const CreateTestPage = () => {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handlePreviewQuestion(q)}
-                                    className="text-blue-600 hover:bg-blue-50"
+                                    className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                   >
                                     <Eye className="h-3 w-3 mr-1" />
                                     View
@@ -1594,7 +1597,7 @@ const CreateTestPage = () => {
                       size="sm"
                       variant="outline"
                       onClick={() => setIsAddingSectionMode(!isAddingSectionMode)}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                     >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Section
@@ -1603,7 +1606,7 @@ const CreateTestPage = () => {
 
                   {/* Add Section Form */}
                   {isAddingSectionMode && (
-                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center gap-2">
                         <Input
                           placeholder="Enter section name (e.g., Section B, Part II)"
@@ -1653,12 +1656,12 @@ const CreateTestPage = () => {
                           className={`${
                             selectedSectionForQuestion === section.id
                               ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'hover:bg-blue-50'
+                              : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
                           }`}
                         >
                           {section.name}
                           {selectedQuestions.filter(q => q.section === section.id).length > 0 && (
-                            <span className="ml-2 text-xs bg-white text-blue-600 px-1.5 py-0.5 rounded-full">
+                            <span className="ml-2 text-xs bg-white dark:bg-blue-800 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded-full">
                               {selectedQuestions.filter(q => q.section === section.id).length}
                             </span>
                           )}
@@ -1669,7 +1672,7 @@ const CreateTestPage = () => {
                             size="sm"
                             variant="ghost"
                             onClick={() => handleRemoveSection(section.id)}
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            className="h-6 w-6 p-0 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -1678,7 +1681,7 @@ const CreateTestPage = () => {
                     ))}
                   </div>
 
-                  <div className="text-xs text-gray-600 mb-4">
+                  <div className="text-xs text-muted-foreground mb-4">
                     Questions will be added to <strong>{sections.find(s => s.id === selectedSectionForQuestion)?.name}</strong>
                   </div>
                 </div>
@@ -1689,10 +1692,10 @@ const CreateTestPage = () => {
                   </h3>
                   <div className="flex items-center gap-4">
                     <div className="text-sm">
-                      Total Marks: <span className="font-bold text-blue-600">{getTotalMarks()}</span>
+                      Total Marks: <span className="font-bold text-blue-600 dark:text-blue-400">{getTotalMarks()}</span>
                     </div>
                     {selectedQuestions.length > 0 && (
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-muted-foreground">
                         Use ↑↓ buttons to reorder questions
                       </div>
                     )}
@@ -1700,7 +1703,7 @@ const CreateTestPage = () => {
                 </div>
 
                 {selectedQuestions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 border-2 border-dashed rounded-lg">
+                  <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                     No questions selected yet
                   </div>
                 ) : (
@@ -1714,10 +1717,10 @@ const CreateTestPage = () => {
                           .sort((a, b) => a.order - b.order);
 
                         return (
-                          <div key={section.id} className="border rounded-lg p-3 bg-white">
+                          <div key={section.id} className="border rounded-lg p-3 bg-card">
                             <div className="flex items-center justify-between mb-3 pb-2 border-b">
-                              <h4 className="font-medium text-gray-900">{section.name}</h4>
-                              <span className="text-sm text-gray-500">
+                              <h4 className="font-medium">{section.name}</h4>
+                              <span className="text-sm text-muted-foreground">
                                 {sectionQuestions.length} question{sectionQuestions.length !== 1 ? 's' : ''} • 
                                 {sectionQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
                               </span>
@@ -1732,11 +1735,11 @@ const CreateTestPage = () => {
                                 return (
                                   <div
                                     key={sq.question}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:border-gray-300 transition-colors"
+                                    className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border hover:border-primary/50 transition-colors"
                                   >
                                     {/* Question Order and Reorder Controls */}
                                     <div className="flex flex-col items-center">
-                                      <span className="font-medium text-gray-700 mb-1">#{sq.order}</span>
+                                      <span className="font-medium mb-1">#{sq.order}</span>
                                       <div className="flex flex-col gap-1">
                                         <Button
                                           type="button"
@@ -1744,7 +1747,7 @@ const CreateTestPage = () => {
                                           variant="ghost"
                                           onClick={() => moveQuestionUp(sq.question)}
                                           disabled={isFirst}
-                                          className="h-6 w-6 p-0 hover:bg-blue-100 disabled:opacity-30"
+                                          className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 disabled:opacity-30"
                                           title="Move up"
                                         >
                                           <ChevronUp className="h-3 w-3" />
@@ -1755,7 +1758,7 @@ const CreateTestPage = () => {
                                           variant="ghost"
                                           onClick={() => moveQuestionDown(sq.question)}
                                           disabled={isLast}
-                                          className="h-6 w-6 p-0 hover:bg-blue-100 disabled:opacity-30"
+                                          className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 disabled:opacity-30"
                                           title="Move down"
                                         >
                                           <ChevronDown className="h-3 w-3" />
@@ -1769,16 +1772,16 @@ const CreateTestPage = () => {
                                         {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
                                       </p>
                                       <div className="flex items-center gap-4 mt-1">
-                                        <p className="text-xs text-gray-600">
+                                        <p className="text-xs text-muted-foreground">
                                           Chapter: {question?.chapter || 'N/A'}
                                         </p>
-                                        <p className="text-xs text-gray-600">
+                                        <p className="text-xs text-muted-foreground">
                                           Difficulty: <span className={`inline-block px-1 py-0.5 rounded text-xs ${
                                             question?.difficultyLevel === 'easy'
-                                              ? 'bg-green-100 text-green-800'
+                                              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
                                               : question?.difficultyLevel === 'medium'
-                                              ? 'bg-yellow-100 text-yellow-800'
-                                              : 'bg-red-100 text-red-800'
+                                              ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                              : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                                           }`}>
                                             {question?.difficultyLevel || 'N/A'}
                                           </span>
@@ -1793,7 +1796,7 @@ const CreateTestPage = () => {
                                         <select
                                           value={sq.section || 'default'}
                                           onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
-                                          className="text-xs border rounded px-2 py-1 bg-white"
+                                          className="text-xs border rounded px-2 py-1 bg-background"
                                         >
                                           {sections.map((sec) => (
                                             <option key={sec.id} value={sec.id}>
@@ -1819,7 +1822,7 @@ const CreateTestPage = () => {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => question && handlePreviewQuestion(question)}
-                                        className="text-blue-600 hover:bg-blue-50"
+                                        className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                                         title="View full question"
                                       >
                                         <Eye className="h-4 w-4" />
@@ -1829,7 +1832,7 @@ const CreateTestPage = () => {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => handleRemoveQuestion(sq.question)}
-                                        className="text-red-600 hover:bg-red-50"
+                                        className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
                                         title="Remove question"
                                       >
                                         <Trash2 className="h-4 w-4" />
@@ -1852,16 +1855,16 @@ const CreateTestPage = () => {
                       if (orphanedQuestions.length === 0) return null;
                       
                       return (
-                        <div className="border rounded-lg p-3 bg-yellow-50 border-yellow-200">
-                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-yellow-200">
-                            <h4 className="font-medium text-gray-900">
+                        <div className="border rounded-lg p-3 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-yellow-200 dark:border-yellow-800">
+                            <h4 className="font-medium">
                               ⚠️ Questions without section
                             </h4>
-                            <span className="text-sm text-gray-500">
+                            <span className="text-sm text-muted-foreground">
                               {orphanedQuestions.length} question{orphanedQuestions.length !== 1 ? 's' : ''}
                             </span>
                           </div>
-                          <div className="text-xs text-yellow-700 mb-2">
+                          <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-2">
                             These questions need to be assigned to a section
                           </div>
                           
@@ -1872,17 +1875,17 @@ const CreateTestPage = () => {
                               return (
                                 <div
                                   key={sq.question}
-                                  className="flex items-center gap-3 p-3 bg-yellow-100 rounded-lg border border-yellow-200"
+                                  className="flex items-center gap-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-800"
                                 >
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">
                                       {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
                                     </p>
                                     <div className="flex items-center gap-4 mt-1">
-                                      <p className="text-xs text-gray-600">
+                                      <p className="text-xs text-muted-foreground">
                                         Chapter: {question?.chapter || 'N/A'}
                                       </p>
-                                      <p className="text-xs text-gray-600">
+                                      <p className="text-xs text-muted-foreground">
                                         Marks: {sq.marks}
                                       </p>
                                     </div>
@@ -1894,7 +1897,7 @@ const CreateTestPage = () => {
                                       <select
                                         value={sq.section || 'default'}
                                         onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
-                                        className="text-xs border rounded px-2 py-1 bg-white"
+                                        className="text-xs border rounded px-2 py-1 bg-background"
                                       >
                                         {sections.map((sec) => (
                                           <option key={sec.id} value={sec.id}>
@@ -1908,7 +1911,7 @@ const CreateTestPage = () => {
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => handleRemoveQuestion(sq.question)}
-                                      className="h-6 w-6 p-0 hover:bg-red-100 text-red-600"
+                                      className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
                                       title="Remove question"
                                     >
                                       <X className="h-3 w-3" />
@@ -1967,21 +1970,21 @@ const CreateTestPage = () => {
                   <p className="text-sm">{previewQuestion.chapter}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Topic:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Topic:</span>
                   <p className="text-sm">{previewQuestion.topic || 'N/A'}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Marks:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Marks:</span>
                   <p className="text-sm font-semibold">{previewQuestion.marks}</p>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-600">Difficulty:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Difficulty:</span>
                   <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                     previewQuestion.difficultyLevel === 'easy'
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
                       : previewQuestion.difficultyLevel === 'medium'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-red-100 text-red-800'
+                      ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                      : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                   }`}>
                     {previewQuestion.difficultyLevel}
                   </span>
@@ -1991,8 +1994,8 @@ const CreateTestPage = () => {
               {/* Question Text */}
               <div>
                 <h3 className="text-lg font-semibold mb-3">Question:</h3>
-                <div className="p-4 border rounded-lg bg-white">
-                  <div className="text-gray-800 whitespace-pre-wrap">
+                <div className="p-4 border rounded-lg bg-card">
+                  <div className="whitespace-pre-wrap">
                     {renderQuestionTextWithAttachments(previewQuestion.questionText, previewQuestion.attachments)}
                   </div>
                   
@@ -2019,19 +2022,19 @@ const CreateTestPage = () => {
                         key={index} 
                         className={`p-3 border rounded-lg ${
                           previewQuestion.correctAnswer === option 
-                            ? 'bg-green-50 border-green-200' 
-                            : 'bg-white border-gray-200'
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                            : 'bg-card'
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <span className="font-medium text-gray-600">
+                          <span className="font-medium text-muted-foreground">
                             {String.fromCharCode(65 + index)}.
                           </span>
-                          <div className={previewQuestion.correctAnswer === option ? 'font-medium text-green-800' : ''}>
+                          <div className={previewQuestion.correctAnswer === option ? 'font-medium text-green-800 dark:text-green-400' : ''}>
                             {renderQuestionTextWithAttachments(option, previewQuestion.attachments)}
                           </div>
                           {previewQuestion.correctAnswer === option && (
-                            <span className="ml-auto text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">
+                            <span className="ml-auto text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded">
                               Correct Answer
                             </span>
                           )}
@@ -2046,8 +2049,8 @@ const CreateTestPage = () => {
               {previewQuestion.correctAnswer && (!previewQuestion.options || previewQuestion.options.length === 0) && (
                 <div>
                   <h3 className="text-lg font-semibold mb-3">Answer:</h3>
-                  <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                    <div className="text-gray-800 whitespace-pre-wrap">
+                  <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                    <div className="whitespace-pre-wrap">
                       {renderQuestionTextWithAttachments(
                         previewQuestion.correctAnswer, 
                         previewQuestion.correctAnswerAttachments || previewQuestion.attachments
@@ -2059,7 +2062,7 @@ const CreateTestPage = () => {
 
               {/* Question Type */}
               {previewQuestion.questionType && (
-                <div className="text-sm text-gray-600 pt-4 border-t">
+                <div className="text-sm text-muted-foreground pt-4 border-t">
                   <span className="font-medium">Question Type: </span>
                   <span className="capitalize">{previewQuestion.questionType.replace('-', ' ')}</span>
                 </div>
@@ -2068,6 +2071,7 @@ const CreateTestPage = () => {
           )}
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 };

@@ -1,21 +1,23 @@
 "use client"
 
 import * as React from "react"
+import { useNavigate, Link } from "react-router-dom"
+import { useAuth } from "@/contexts/AuthContext"
 import {
+  LayoutDashboard,
+  FileText,
+  Users,
+  ClipboardList,
+  BarChart3,
+  GraduationCap,
+  Settings,
   BookOpen,
-  Bot,
-  Command,
-  Frame,
-  LifeBuoy,
-  Map,
-  PieChart,
-  Send,
-  Settings2,
-  SquareTerminal,
+  HelpCircle,
+  UsersRound,
+  FileQuestion,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
@@ -28,157 +30,118 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
-      isActive: true,
-      items: [
-        {
-          title: "History",
-          url: "#",
-        },
-        {
-          title: "Starred",
-          url: "#",
-        },
-        {
-          title: "Settings",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  // Define navigation items based on user role
+  const getNavItems = () => {
+    const commonItems = [
+      {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: LayoutDashboard,
+        isActive: true,
+      },
+      {
+        title: "Tests",
+        url: "/tests",
+        icon: ClipboardList,
+      },
+      {
+        title: "Reports",
+        url: "/reports",
+        icon: BarChart3,
+      },
+    ]
+
+    const teacherAdminItems = [
+      {
+        title: "Questions",
+        url: "/questions",
+        icon: FileQuestion,
+      },
+      {
+        title: "Student Groups",
+        url: "/student-groups",
+        icon: UsersRound,
+      },
+    ]
+
+    const adminItems = [
+      {
+        title: "Subjects",
+        url: "/subjects",
+        icon: BookOpen,
+      },
+      {
+        title: "Users",
+        url: "/users",
+        icon: Users,
+      },
+      {
+        title: "Settings",
+        url: "/settings",
+        icon: Settings,
+      },
+    ]
+
+    if (user?.role === 'admin') {
+      return [...commonItems, ...teacherAdminItems, ...adminItems]
+    } else if (user?.role === 'teacher') {
+      return [...commonItems, ...teacherAdminItems]
+    } else {
+      return commonItems
+    }
+  }
+
+  const userData = {
+    name: user?.name || "User",
+    email: user?.email || "user@smartassess.com",
+    avatar: "/avatars/user.jpg",
+  }
+
+  const navSecondary = [
     {
       title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
+      url: "/docs",
+      icon: FileText,
     },
     {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
+      title: "Help & Support",
+      url: "/support",
+      icon: HelpCircle,
     },
-  ],
-  navSecondary: [
-    {
-      title: "Support",
-      url: "#",
-      icon: LifeBuoy,
-    },
-    {
-      title: "Feedback",
-      url: "#",
-      icon: Send,
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-}
+  ]
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="#">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <Command className="size-4" />
+              <Link to="/dashboard">
+                <div className="bg-linear-to-br from-blue-600 to-blue-800 text-white flex aspect-square size-8 items-center justify-center rounded-lg shadow-sm">
+                  <GraduationCap className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">Acme Inc</span>
-                  <span className="truncate text-xs">Enterprise</span>
+                  <span className="truncate font-semibold">Smart Assessment</span>
+                  <span className="truncate text-xs text-muted-foreground">Platform</span>
                 </div>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={getNavItems()} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} onLogout={() => {
+          logout()
+          navigate('/login')
+        }} />
       </SidebarFooter>
     </Sidebar>
   )

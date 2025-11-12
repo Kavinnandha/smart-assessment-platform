@@ -146,7 +146,7 @@ const TestsPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tests</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold">Tests</h1>
         {isTeacher && (
           <Link to="/tests/create">
             <Button className="w-full sm:w-auto">
@@ -158,14 +158,14 @@ const TestsPage = () => {
       </div>
 
       {loading ? (
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-gray-600">Loading tests...</p>
+        <div className="bg-card p-6 rounded-lg shadow text-center">
+          <p className="text-muted-foreground">Loading tests...</p>
         </div>
       ) : tests.length === 0 ? (
-        <div className="bg-white p-8 sm:p-12 rounded-lg shadow text-center">
-          <FileText className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-gray-400 mb-4" />
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No Tests Found</h2>
-          <p className="text-sm sm:text-base text-gray-600 mb-6">
+        <div className="bg-card p-8 sm:p-12 rounded-lg shadow text-center">
+          <FileText className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-lg sm:text-xl font-semibold mb-2">No Tests Found</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mb-6">
             {isStudent ? 'No tests assigned to you yet' : 'Get started by creating your first test'}
           </p>
           {isTeacher && (
@@ -182,32 +182,32 @@ const TestsPage = () => {
           {tests.map((test) => (
             <div
               key={test._id}
-              className="bg-white p-4 sm:p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+              className="bg-card p-4 sm:p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start justify-between mb-4 gap-2">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 truncate">
+                  <h3 className="text-base sm:text-lg font-semibold mb-1 truncate">
                     {test.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-gray-600 truncate">{test.subject?.name || 'N/A'}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">{test.subject?.name || 'N/A'}</p>
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   {test.isPublished ? (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full whitespace-nowrap">
+                    <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 text-xs rounded-full whitespace-nowrap">
                       Published
                     </span>
                   ) : (
-                    <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full whitespace-nowrap">
+                    <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded-full whitespace-nowrap">
                       Draft
                     </span>
                   )}
                   {isTeacher && test.isPublished && !test.showResultsImmediately && (
                     test.resultsPublished ? (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full whitespace-nowrap">
+                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 text-xs rounded-full whitespace-nowrap">
                         Results Published
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-orange-100 text-orange-800 text-xs rounded-full whitespace-nowrap">
+                      <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-800 dark:text-orange-400 text-xs rounded-full whitespace-nowrap">
                         Results Pending
                       </span>
                     )
@@ -216,20 +216,20 @@ const TestsPage = () => {
               </div>
 
               <div className="space-y-2 mb-4">
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Clock className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                   <span>{test.duration} minutes</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <FileText className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                   <span>{test.questions.length} questions ({test.totalMarks} marks)</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                   <span>Assigned to {test.assignedTo.length} students</span>
                 </div>
                 {test.scheduledDate && (
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                     <Calendar className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
                     <span className="truncate">{formatDate(test.scheduledDate)}</span>
                   </div>
@@ -255,8 +255,8 @@ const TestsPage = () => {
                                 View Results
                               </Button>
                             </Link>
-                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                              <span className="px-2 py-1 bg-gray-100 rounded text-center">
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                              <span className="px-2 py-1 bg-muted/50 rounded text-center">
                                 {submission.status === 'evaluated' 
                                   ? `Evaluated - ${submission.totalMarksObtained || 0}/${test.totalMarks}` 
                                   : 'Pending Evaluation'}
@@ -268,12 +268,12 @@ const TestsPage = () => {
                         // Results not yet published by teacher
                         return (
                           <div className="flex flex-col gap-2">
-                            <Button size="sm" className="w-full bg-gray-400 cursor-not-allowed text-xs sm:text-sm" disabled>
+                            <Button size="sm" className="w-full cursor-not-allowed text-xs sm:text-sm" disabled variant="secondary">
                               <Clock className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                               Results Pending
                             </Button>
-                            <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-                              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-center">
+                            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                              <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded text-center">
                                 Submitted - Awaiting Result Publication
                               </span>
                             </div>

@@ -73,11 +73,11 @@ const SubmissionsPage = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold">
             {isStudent ? 'My Test Results' : 'Submissions'}
           </h1>
           {isStudent && (
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               View your test submissions and scores
             </p>
           )}
@@ -85,14 +85,14 @@ const SubmissionsPage = () => {
       </div>
 
       {loading ? (
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <p className="text-gray-600">Loading submissions...</p>
+        <div className="bg-card p-6 rounded-lg shadow text-center">
+          <p className="text-muted-foreground">Loading submissions...</p>
         </div>
       ) : !testId ? (
-        <div className="bg-white p-12 rounded-lg shadow text-center">
-          <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">No Test Selected</h2>
-          <p className="text-gray-600 mb-4">
+        <div className="bg-card p-12 rounded-lg shadow text-center">
+          <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Test Selected</h2>
+          <p className="text-muted-foreground mb-4">
             Please select a test from the Tests page to view its submissions
           </p>
           <Button onClick={() => window.location.href = '/tests'}>
@@ -100,10 +100,10 @@ const SubmissionsPage = () => {
           </Button>
         </div>
       ) : submissions.length === 0 ? (
-        <div className="bg-white p-12 rounded-lg shadow text-center">
-          <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">No Submissions Found</h2>
-          <p className="text-gray-600">
+        <div className="bg-card p-12 rounded-lg shadow text-center">
+          <FileText className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Submissions Found</h2>
+          <p className="text-muted-foreground">
             {isStudent 
               ? "You haven't submitted this test yet" 
               : 'No submissions for this test yet'
@@ -117,16 +117,16 @@ const SubmissionsPage = () => {
               // Student View - Show their own results
               <div
                 key={submission._id}
-                className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+                className="bg-card p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-4">
-                      <h3 className="text-xl font-semibold text-gray-900">
+                      <h3 className="text-xl font-semibold">
                         {submission.test.title}
                       </h3>
                       {submission.test.subject && (
-                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full">
+                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 text-sm rounded-full">
                           {submission.test.subject.name}
                         </span>
                       )}
@@ -134,27 +134,27 @@ const SubmissionsPage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
                       <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-blue-600" />
+                        <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                         <div>
-                          <p className="text-xs text-gray-500">Submitted On</p>
-                          <p className="font-medium text-gray-900">{formatDate(submission.submittedAt)}</p>
+                          <p className="text-xs text-muted-foreground">Submitted On</p>
+                          <p className="font-medium">{formatDate(submission.submittedAt)}</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         <div className={`p-2 rounded-lg ${
-                          submission.status === 'evaluated' ? 'bg-green-100' : 'bg-yellow-100'
+                          submission.status === 'evaluated' ? 'bg-green-100 dark:bg-green-900/20' : 'bg-yellow-100 dark:bg-yellow-900/20'
                         }`}>
                           {submission.status === 'evaluated' ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : (
-                            <Clock className="h-5 w-5 text-yellow-600" />
+                            <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
                           )}
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500">Status</p>
+                          <p className="text-xs text-muted-foreground">Status</p>
                           <p className={`font-medium ${
-                            submission.status === 'evaluated' ? 'text-green-600' : 'text-yellow-600'
+                            submission.status === 'evaluated' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
                           }`}>
                             {submission.status === 'evaluated' ? 'Evaluated' : 'Pending Evaluation'}
                           </p>
@@ -162,20 +162,20 @@ const SubmissionsPage = () => {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <Award className="h-5 w-5 text-purple-600" />
+                        <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                         <div>
-                          <p className="text-xs text-gray-500">Score</p>
+                          <p className="text-xs text-muted-foreground">Score</p>
                           {submission.status === 'evaluated' ? (
                             <>
                               <p className={`text-2xl font-bold ${getScoreColor(submission.totalMarksObtained || 0, submission.test.totalMarks)}`}>
                                 {submission.totalMarksObtained || 0} / {submission.test.totalMarks}
                               </p>
-                              <p className="text-xs text-gray-600">
+                              <p className="text-xs text-muted-foreground">
                                 {((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100).toFixed(1)}%
                               </p>
                             </>
                           ) : (
-                            <p className="text-gray-400 font-medium">Not evaluated yet</p>
+                            <p className="text-muted-foreground font-medium">Not evaluated yet</p>
                           )}
                         </div>
                       </div>
@@ -185,12 +185,12 @@ const SubmissionsPage = () => {
                       <div className="mt-4 pt-4 border-t">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-muted-foreground">
                               Performance: <span className={`font-semibold ${
-                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 75 ? 'text-green-600' :
-                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 60 ? 'text-blue-600' :
-                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 50 ? 'text-yellow-600' :
-                                'text-red-600'
+                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 75 ? 'text-green-600 dark:text-green-400' :
+                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 60 ? 'text-blue-600 dark:text-blue-400' :
+                                ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
+                                'text-red-600 dark:text-red-400'
                               }`}>
                                 {((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 75 ? 'Excellent' :
                                  ((submission.totalMarksObtained || 0) / submission.test.totalMarks * 100) >= 60 ? 'Good' :
@@ -219,26 +219,26 @@ const SubmissionsPage = () => {
               // Teacher View - Original layout
             <div
               key={submission._id}
-              className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
+              className="bg-card p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className="text-lg font-semibold">
                       {submission.test.title}
                     </h3>
                     {submission.test.subject && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 text-xs rounded-full">
                         {submission.test.subject.name}
                       </span>
                     )}
                     {submission.status === 'evaluated' ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full flex items-center gap-1">
+                      <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 text-xs rounded-full flex items-center gap-1">
                         <CheckCircle className="h-3 w-3" />
                         Evaluated
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full flex items-center gap-1">
+                      <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded-full flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         Pending
                       </span>
@@ -246,32 +246,32 @@ const SubmissionsPage = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <User className="h-4 w-4" />
                       <div>
-                        <p className="font-medium text-gray-900">{submission.student.name}</p>
+                        <p className="font-medium">{submission.student.name}</p>
                         <p className="text-xs">{submission.student.email}</p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
                       <div>
-                        <p className="text-xs text-gray-500">Submitted</p>
+                        <p className="text-xs text-muted-foreground">Submitted</p>
                         <p>{formatDate(submission.submittedAt)}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 text-sm">
-                      <FileText className="h-4 w-4 text-gray-600" />
+                      <FileText className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-gray-500">Score</p>
+                        <p className="text-xs text-muted-foreground">Score</p>
                         {submission.status === 'evaluated' ? (
                           <p className={`font-semibold ${getScoreColor(submission.totalMarksObtained || 0, submission.test.totalMarks)}`}>
                             {submission.totalMarksObtained || 0} / {submission.test.totalMarks}
                           </p>
                         ) : (
-                          <p className="text-gray-400">Not evaluated</p>
+                          <p className="text-muted-foreground">Not evaluated</p>
                         )}
                       </div>
                     </div>

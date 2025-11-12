@@ -213,7 +213,7 @@ const SubjectQuestionsPage = () => {
     fileSize: number;
   }>, attachmentPosition?: string) => {
     if (!attachments || attachments.length === 0) {
-      return <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>;
+      return <p className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">{answerText}</p>;
     }
 
     // If position is 'before', show attachments before the text
@@ -223,7 +223,7 @@ const SubjectQuestionsPage = () => {
           <div className="mb-4 space-y-2">
             {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
           </div>
-          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+          <p className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">{answerText}</p>
         </>
       );
     }
@@ -232,7 +232,7 @@ const SubjectQuestionsPage = () => {
     if (attachmentPosition === 'after' || !attachmentPosition) {
       return (
         <>
-          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+          <p className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">{answerText}</p>
           <div className="mt-4 space-y-2">
             {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
           </div>
@@ -248,7 +248,7 @@ const SubjectQuestionsPage = () => {
       // No placeholders found, display attachments at the end
       return (
         <>
-          <p className="text-base whitespace-pre-wrap text-green-900">{answerText}</p>
+          <p className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">{answerText}</p>
           <div className="mt-4 space-y-2">
             {attachments.map((attachment, idx) => renderAttachment(attachment, idx, 'green'))}
           </div>
@@ -288,7 +288,7 @@ const SubjectQuestionsPage = () => {
     }
 
     return (
-      <div className="text-base whitespace-pre-wrap text-green-900">
+      <div className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">
         {parts.map((part, idx) => 
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
@@ -304,15 +304,15 @@ const SubjectQuestionsPage = () => {
     fileSize: number;
   }, idx: number, colorTheme: 'blue' | 'green') => {
     const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
-    const borderColor = colorTheme === 'blue' ? 'border-blue-300' : 'border-green-300';
-    const bgColor = colorTheme === 'blue' ? 'bg-blue-50' : 'bg-green-50';
-    const textColor = colorTheme === 'blue' ? 'text-blue-900' : 'text-green-900';
-    const hoverColor = colorTheme === 'blue' ? 'hover:text-blue-700' : 'hover:text-green-700';
+    const borderColor = colorTheme === 'blue' ? 'border-blue-300 dark:border-blue-700' : 'border-green-300 dark:border-green-700';
+    const bgColor = colorTheme === 'blue' ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-green-50 dark:bg-green-900/20';
+    const textColor = colorTheme === 'blue' ? 'text-blue-900 dark:text-blue-400' : 'text-green-900 dark:text-green-400';
+    const hoverColor = colorTheme === 'blue' ? 'hover:text-blue-700 dark:hover:text-blue-300' : 'hover:text-green-700 dark:hover:text-green-300';
 
     return (
-      <div key={idx} className={`border ${borderColor} rounded-lg overflow-hidden bg-white inline-block max-w-full`}>
+      <div key={idx} className={`border ${borderColor} rounded-lg overflow-hidden bg-card inline-block max-w-full`}>
         {attachment.fileType.startsWith('image/') ? (
-          <div className="relative bg-gray-100">
+          <div className="relative bg-muted/30">
             <img
               src={fileUrl}
               alt={attachment.fileName}
@@ -321,8 +321,8 @@ const SubjectQuestionsPage = () => {
             />
           </div>
         ) : (
-          <div className="flex items-center justify-center h-40 bg-gray-50">
-            <File className="w-12 h-12 text-gray-400" />
+          <div className="flex items-center justify-center h-40 bg-muted/30">
+            <File className="w-12 h-12 text-muted-foreground" />
           </div>
         )}
         <div className={`p-2 border-t ${borderColor} ${bgColor}`}>
@@ -369,12 +369,12 @@ const SubjectQuestionsPage = () => {
             Back to Subjects
           </Button>
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <BookOpen className="h-6 w-6 text-blue-600" />
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <BookOpen className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{subject?.name || 'Loading...'}</h1>
-              <p className="text-gray-600 mt-1">{questions.length} question{questions.length !== 1 ? 's' : ''}</p>
+              <h1 className="text-3xl font-bold">{subject?.name || 'Loading...'}</h1>
+              <p className="text-muted-foreground mt-1">{questions.length} question{questions.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
         </div>
@@ -389,7 +389,7 @@ const SubjectQuestionsPage = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg shadow-sm border">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="md:col-span-2">
             <Input
@@ -402,7 +402,7 @@ const SubjectQuestionsPage = () => {
           <select
             value={filter.difficulty}
             onChange={(e) => setFilter({ ...filter, difficulty: e.target.value })}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border rounded-md bg-background"
           >
             <option value="">All Difficulties</option>
             <option value="easy">Easy</option>
@@ -412,7 +412,7 @@ const SubjectQuestionsPage = () => {
           <select
             value={filter.chapter}
             onChange={(e) => setFilter({ ...filter, chapter: e.target.value })}
-            className="px-3 py-2 border rounded-md"
+            className="px-3 py-2 border rounded-md bg-background"
           >
             <option value="">All Chapters</option>
             {subject?.chapters?.map((chapter: Chapter, idx: number) => (
@@ -430,24 +430,24 @@ const SubjectQuestionsPage = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-600">Total Questions</p>
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <p className="text-sm text-muted-foreground">Total Questions</p>
           <p className="text-2xl font-bold">{questions.length}</p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-600">Easy</p>
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <p className="text-sm text-muted-foreground">Easy</p>
           <p className="text-2xl font-bold text-green-600">
             {questions.filter((q: any) => q.difficultyLevel === 'easy').length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-600">Medium</p>
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <p className="text-sm text-muted-foreground">Medium</p>
           <p className="text-2xl font-bold text-yellow-600">
             {questions.filter((q: any) => q.difficultyLevel === 'medium').length}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm border">
-          <p className="text-sm text-gray-600">Hard</p>
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <p className="text-sm text-muted-foreground">Hard</p>
           <p className="text-2xl font-bold text-red-600">
             {questions.filter((q: any) => q.difficultyLevel === 'hard').length}
           </p>
@@ -457,47 +457,47 @@ const SubjectQuestionsPage = () => {
       {/* Questions List - Grouped by Chapter */}
       <div className="space-y-4">
         {loading ? (
-          <div className="bg-white p-8 rounded-lg shadow text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <p className="mt-2 text-gray-600">Loading questions...</p>
+          <div className="bg-card p-8 rounded-lg shadow text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <p className="mt-2 text-muted-foreground">Loading questions...</p>
           </div>
         ) : questions.length === 0 ? (
-          <div className="bg-white p-8 rounded-lg shadow text-center text-gray-500">
+          <div className="bg-card p-8 rounded-lg shadow text-center text-muted-foreground">
             No questions found for this subject
           </div>
         ) : (
           Object.entries(questionsByChapter).map(([chapter, chapterQuestions]: [string, any]) => (
-            <div key={chapter} className="bg-white rounded-lg shadow-sm border">
+            <div key={chapter} className="bg-card rounded-lg shadow-sm border">
               {/* Chapter Header */}
-              <div className="p-4 bg-gray-50 border-b">
+              <div className="p-4 bg-muted/30 border-b">
                 <h3 className="font-semibold text-lg">{chapter}</h3>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   {chapterQuestions.length} question{chapterQuestions.length !== 1 ? 's' : ''}
                 </p>
               </div>
 
               {/* Questions Table */}
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-border">
+                  <thead className="bg-muted/30">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Question No</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Topic</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Difficulty</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marks</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Question No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Topic</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Difficulty</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Marks</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-card divide-y divide-border">
                     {chapterQuestions.map((q: any) => (
-                      <tr key={q._id} className="hover:bg-gray-50">
+                      <tr key={q._id} className="hover:bg-muted/20">
                         <td className="px-6 py-4 whitespace-nowrap font-medium">{`Q${chapterQuestions.indexOf(q) + 1}`}</td>
                         <td className="px-6 py-4">{q.topic || '-'}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            q.difficultyLevel === 'easy' ? 'bg-green-100 text-green-800' :
-                            q.difficultyLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
+                            q.difficultyLevel === 'easy' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
+                            q.difficultyLevel === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' :
+                            'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                           }`}>
                             {q.difficultyLevel}
                           </span>
@@ -521,7 +521,7 @@ const SubjectQuestionsPage = () => {
                               size="sm" 
                               variant="outline" 
                               onClick={() => handleDelete(q._id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -550,38 +550,38 @@ const SubjectQuestionsPage = () => {
           {selectedQuestion && (
             <div className="space-y-6 mt-4">
               {/* Basic Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Chapter</p>
+                  <p className="text-sm font-medium text-muted-foreground">Chapter</p>
                   <p className="text-base font-semibold">{selectedQuestion.chapter}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Topic</p>
+                  <p className="text-sm font-medium text-muted-foreground">Topic</p>
                   <p className="text-base font-semibold">{selectedQuestion.topic || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Difficulty</p>
+                  <p className="text-sm font-medium text-muted-foreground">Difficulty</p>
                   <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedQuestion.difficultyLevel === 'easy' ? 'bg-green-100 text-green-800' :
-                    selectedQuestion.difficultyLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
+                    selectedQuestion.difficultyLevel === 'easy' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
+                    selectedQuestion.difficultyLevel === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' :
+                    'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                   }`}>
                     {selectedQuestion.difficultyLevel}
                   </span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Marks</p>
+                  <p className="text-sm font-medium text-muted-foreground">Marks</p>
                   <p className="text-base font-semibold">{selectedQuestion.marks}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Question Type</p>
+                  <p className="text-sm font-medium text-muted-foreground">Question Type</p>
                   <p className="text-base font-semibold capitalize">{selectedQuestion.questionType?.replace('-', ' ')}</p>
                 </div>
               </div>
 
               {/* Question Text */}
               <div className="p-4 border rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-2">Question</p>
+                <p className="text-sm font-medium mb-2">Question</p>
                 {renderQuestionWithAttachments(
                   selectedQuestion.questionText,
                   selectedQuestion.attachments,
@@ -595,13 +595,13 @@ const SubjectQuestionsPage = () => {
                selectedQuestion.attachmentPosition !== 'custom' &&
                selectedQuestion.attachmentPosition !== 'before' &&
                selectedQuestion.attachmentPosition !== 'after' && (
-                <div className="p-4 border border-blue-200 bg-blue-50 rounded-lg">
+                <div className="p-4 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-blue-900">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-400">
                       Question Attachments ({selectedQuestion.attachments.length})
                     </p>
                     {selectedQuestion.attachmentPosition && (
-                      <span className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded">
+                      <span className="text-xs px-2 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded">
                         Position: {selectedQuestion.attachmentPosition}
                       </span>
                     )}
@@ -610,9 +610,9 @@ const SubjectQuestionsPage = () => {
                     {selectedQuestion.attachments.map((attachment: any, idx: number) => {
                       const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
                       return (
-                        <div key={idx} className="border border-blue-300 rounded-lg overflow-hidden bg-white">
+                        <div key={idx} className="border border-blue-300 dark:border-blue-700 rounded-lg overflow-hidden bg-card">
                           {attachment.fileType.startsWith('image/') ? (
-                            <div className="relative h-40 bg-gray-100 flex items-center justify-center">
+                            <div className="relative h-40 bg-muted/30 flex items-center justify-center">
                               <img
                                 src={fileUrl}
                                 alt={attachment.fileName}
@@ -621,20 +621,20 @@ const SubjectQuestionsPage = () => {
                               />
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center h-40 bg-gray-50">
-                              <File className="w-12 h-12 text-gray-400" />
+                            <div className="flex items-center justify-center h-40 bg-muted/30">
+                              <File className="w-12 h-12 text-muted-foreground" />
                             </div>
                           )}
-                          <div className="p-2 border-t border-blue-200 bg-blue-50">
+                          <div className="p-2 border-t border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                             <a 
                               href={fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-medium text-blue-900 hover:text-blue-700 truncate block"
+                              className="text-xs font-medium text-blue-900 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate block"
                             >
                               {attachment.fileName}
                             </a>
-                            <p className="text-xs text-blue-700">
+                            <p className="text-xs text-blue-700 dark:text-blue-500">
                               {formatFileSize(attachment.fileSize)}
                             </p>
                           </div>
@@ -648,20 +648,20 @@ const SubjectQuestionsPage = () => {
               {/* Options (for MCQ and True/False) */}
               {selectedQuestion.options && selectedQuestion.options.length > 0 && (
                 <div className="p-4 border rounded-lg">
-                  <p className="text-sm font-medium text-gray-700 mb-3">Options</p>
+                  <p className="text-sm font-medium mb-3">Options</p>
                   <div className="space-y-2">
                     {selectedQuestion.options.map((option: string, idx: number) => (
                       <div 
                         key={idx} 
                         className={`p-3 rounded-lg ${
                           option === selectedQuestion.correctAnswer 
-                            ? 'bg-green-100 border border-green-300' 
-                            : 'bg-gray-50 border border-gray-200'
+                            ? 'bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700' 
+                            : 'bg-muted/30 border'
                         }`}
                       >
                         <span className="font-medium">{String.fromCharCode(65 + idx)}.</span> {option}
                         {option === selectedQuestion.correctAnswer && (
-                          <span className="ml-2 text-xs font-semibold text-green-700">✓ Correct</span>
+                          <span className="ml-2 text-xs font-semibold text-green-700 dark:text-green-400">✓ Correct</span>
                         )}
                       </div>
                     ))}
@@ -670,8 +670,8 @@ const SubjectQuestionsPage = () => {
               )}
 
               {/* Correct Answer */}
-              <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-green-900 mb-2">Correct Answer</p>
+              <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <p className="text-sm font-medium text-green-900 dark:text-green-400 mb-2">Correct Answer</p>
                 {renderAnswerWithAttachments(
                   selectedQuestion.correctAnswer,
                   selectedQuestion.correctAnswerAttachments,
@@ -685,13 +685,13 @@ const SubjectQuestionsPage = () => {
                selectedQuestion.correctAnswerAttachmentPosition !== 'custom' &&
                selectedQuestion.correctAnswerAttachmentPosition !== 'before' &&
                selectedQuestion.correctAnswerAttachmentPosition !== 'after' && (
-                <div className="p-4 border border-green-200 bg-green-50 rounded-lg">
+                <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-green-900">
+                    <p className="text-sm font-medium text-green-900 dark:text-green-400">
                       Answer Attachments ({selectedQuestion.correctAnswerAttachments.length})
                     </p>
                     {selectedQuestion.correctAnswerAttachmentPosition && (
-                      <span className="text-xs px-2 py-1 bg-green-200 text-green-800 rounded">
+                      <span className="text-xs px-2 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 rounded">
                         Position: {selectedQuestion.correctAnswerAttachmentPosition}
                       </span>
                     )}
@@ -700,9 +700,9 @@ const SubjectQuestionsPage = () => {
                     {selectedQuestion.correctAnswerAttachments.map((attachment: any, idx: number) => {
                       const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
                       return (
-                        <div key={idx} className="border border-green-300 rounded-lg overflow-hidden bg-white">
+                        <div key={idx} className="border border-green-300 dark:border-green-700 rounded-lg overflow-hidden bg-card">
                           {attachment.fileType.startsWith('image/') ? (
-                            <div className="relative h-40 bg-gray-100 flex items-center justify-center">
+                            <div className="relative h-40 bg-muted/30 flex items-center justify-center">
                               <img
                                 src={fileUrl}
                                 alt={attachment.fileName}
@@ -711,20 +711,20 @@ const SubjectQuestionsPage = () => {
                               />
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center h-40 bg-gray-50">
-                              <File className="w-12 h-12 text-gray-400" />
+                            <div className="flex items-center justify-center h-40 bg-muted/30">
+                              <File className="w-12 h-12 text-muted-foreground" />
                             </div>
                           )}
-                          <div className="p-2 border-t border-green-200 bg-green-50">
+                          <div className="p-2 border-t border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
                             <a 
                               href={fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-xs font-medium text-green-900 hover:text-green-700 truncate block"
+                              className="text-xs font-medium text-green-900 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 truncate block"
                             >
                               {attachment.fileName}
                             </a>
-                            <p className="text-xs text-green-700">
+                            <p className="text-xs text-green-700 dark:text-green-500">
                               {formatFileSize(attachment.fileSize)}
                             </p>
                           </div>
@@ -736,7 +736,7 @@ const SubjectQuestionsPage = () => {
               )}
 
               {/* Footer Info */}
-              <div className="pt-4 border-t text-sm text-gray-500">
+              <div className="pt-4 border-t text-sm text-muted-foreground">
                 <p>Created by: {selectedQuestion.createdBy?.name || 'Unknown'}</p>
                 <p>Created: {new Date(selectedQuestion.createdAt).toLocaleString()}</p>
                 {selectedQuestion.updatedAt && selectedQuestion.updatedAt !== selectedQuestion.createdAt && (
