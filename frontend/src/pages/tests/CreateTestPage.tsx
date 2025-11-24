@@ -16,9 +16,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Plus, Trash2, Wand2, Eye, X, Calendar as CalendarIcon, GripVertical, Clock, Filter, Layers, Pencil, Check, ChevronsUpDown } from 'lucide-react';
+
+import { Search, Plus, Trash2, Wand2, Eye, X, Calendar as CalendarIcon, GripVertical, Filter, Layers, Pencil, Check, ChevronsUpDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -141,12 +143,12 @@ function MultiSelectCheckbox({
           <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[200px] p-0" align="start">
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command>
           <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} className="h-8 text-xs" />
           <CommandList>
             <CommandEmpty>No item found.</CommandEmpty>
-            <CommandGroup className="max-h-64 overflow-y-auto">
+            <CommandGroup className="max-h-64 overflow-y-auto dark:scrollbar-default dark:scrollbar-thin dark:scrollbar-thumb-slate-700 dark:scrollbar-track-transparent">
               {options.map((option) => (
                 <CommandItem
                   key={option.value}
@@ -335,6 +337,8 @@ const CreateTestPage = () => {
     questionTypes: [] as string[],
   });
 
+  const [showFilters, setShowFilters] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -376,8 +380,8 @@ const CreateTestPage = () => {
 
   const fetchStudents = async () => {
     try {
-      const response = await api.get('/auth/students');
-      setStudents(response.data);
+      const response = await api.get('/users?role=student');
+      setStudents(response.data.users);
     } catch (error) {
       console.error('Failed to fetch students:', error);
     }
@@ -412,13 +416,13 @@ const CreateTestPage = () => {
     try {
       setInitialLoading(true);
       const response = await api.get(`/tests/${id}`);
-      const test = response.data;
+      const test = response.data.test;
 
       setLabel(test._id, test.title);
 
       setFormData({
         title: test.title,
-        subject: test.subject._id,
+        subject: typeof test.subject === 'object' ? test.subject._id : test.subject,
         description: test.description || '',
         duration: test.duration.toString(),
         scheduledTime: test.scheduledFor ? new Date(test.scheduledFor).toTimeString().slice(0, 5) : '09:00',
@@ -638,6 +642,63 @@ const CreateTestPage = () => {
     }
   };
 
+  // Filter Helper Functions
+  const selectAllChapters = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      chapters: chapterOptions.map(c => c.value)
+    }));
+  };
+
+  const deselectAllChapters = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      chapters: []
+    }));
+  };
+
+  const selectAllTopics = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      topics: topicOptions.map(t => t.value)
+    }));
+  };
+
+  const deselectAllTopics = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      topics: []
+    }));
+  };
+
+  const selectAllDifficulty = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      difficulty: ['easy', 'medium', 'hard']
+    }));
+  };
+
+  const deselectAllDifficulty = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      difficulty: []
+    }));
+  };
+
+  const selectAllMarks = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      marks: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '15', '20']
+    }));
+  };
+
+  const deselectAllMarks = () => {
+    setCommonFilters(prev => ({
+      ...prev,
+      marks: []
+    }));
+  };
+
   const handlePreviewQuestion = (question: Question) => {
     setPreviewQuestion(question);
     setIsPreviewOpen(true);
@@ -799,7 +860,7 @@ const CreateTestPage = () => {
 
   // Derive topic options based on selected chapters
   const topicOptions = currentSubject?.chapters
-    .filter(c => commonFilters.chapters.includes(c.name))
+    .filter(c => commonFilters.chapters.length === 0 || commonFilters.chapters.includes(c.name))
     .flatMap(c => c.topics.map(t => ({ label: t, value: t }))) || [];
 
   return (
@@ -908,24 +969,18 @@ const CreateTestPage = () => {
                           <div className="flex-1 space-y-1">
                             <Label className="text-xs text-muted-foreground">Start Time</Label>
                             <div className="relative">
-                              <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                type="time"
-                                className="pl-8"
+                              <TimePicker
                                 value={formData.scheduledTime}
-                                onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
+                                onChange={(val) => setFormData({ ...formData, scheduledTime: val })}
                               />
                             </div>
                           </div>
                           <div className="flex-1 space-y-1">
                             <Label className="text-xs text-muted-foreground">End Time</Label>
                             <div className="relative">
-                              <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                type="time"
-                                className="pl-8"
+                              <TimePicker
                                 value={formData.deadlineTime}
-                                onChange={(e) => setFormData({ ...formData, deadlineTime: e.target.value })}
+                                onChange={(val) => setFormData({ ...formData, deadlineTime: val })}
                               />
                             </div>
                           </div>
@@ -1069,72 +1124,51 @@ const CreateTestPage = () => {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">Questions</CardTitle>
-                      <div className="flex bg-muted rounded-lg p-1">
-                        <button
-                          onClick={() => setMode('manual')}
-                          className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'manual' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                        >
-                          Manual
-                        </button>
-                        <button
-                          onClick={() => setMode('auto')}
-                          className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'auto' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
-                        >
-                          Auto
-                        </button>
+                      <div className="flex gap-2 items-center">
+                        {(commonFilters.chapters.length > 0 || commonFilters.topics.length > 0 || commonFilters.difficulty.length > 0 || commonFilters.marks.length > 0) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setCommonFilters({ chapters: [], topics: [], difficulty: [], marks: [] })}
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-3 w-3 mr-1" /> Clear Filters
+                          </Button>
+                        )}
+                        <div className="flex bg-muted rounded-lg p-1">
+                          <button
+                            onClick={() => setMode('manual')}
+                            className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'manual' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                          >
+                            Manual
+                          </button>
+                          <button
+                            onClick={() => setMode('auto')}
+                            className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'auto' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                          >
+                            Auto
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
-                  <div className="px-6 pb-4 space-y-4 border-b">
-                    {/* Common Filters */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Chapters</Label>
-                        <MultiSelectCheckbox
-                          options={chapterOptions}
-                          selected={commonFilters.chapters}
-                          onChange={(selected) => setCommonFilters({ ...commonFilters, chapters: selected })}
-                          placeholder="Chapters"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Topics</Label>
-                        <MultiSelectCheckbox
-                          options={topicOptions}
-                          selected={commonFilters.topics}
-                          onChange={(selected) => setCommonFilters({ ...commonFilters, topics: selected })}
-                          placeholder="Topics"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Difficulty</Label>
-                        <MultiSelectCheckbox
-                          options={[
-                            { label: 'Easy', value: 'easy' },
-                            { label: 'Medium', value: 'medium' },
-                            { label: 'Hard', value: 'hard' },
-                          ]}
-                          selected={commonFilters.difficulty}
-                          onChange={(selected) => setCommonFilters({ ...commonFilters, difficulty: selected })}
-                          placeholder="Difficulty"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Marks</Label>
-                        <MultiSelectCheckbox
-                          options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '15', '20'].map(m => ({ label: m, value: m }))}
-                          selected={commonFilters.marks}
-                          onChange={(selected) => setCommonFilters({ ...commonFilters, marks: selected })}
-                          placeholder="Marks"
-                          className="h-8 text-xs"
-                        />
-                      </div>
-                    </div>
+                  <div className="px-6 pb-4 border-b flex items-center gap-2">
+                    <Button
+                      variant={showFilters ? "secondary" : "outline"}
+                      className="w-full justify-between"
+                      size="sm"
+                      onClick={() => setShowFilters(!showFilters)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <Filter className="h-4 w-4" />
+                        {showFilters ? "Hide Filters" : "Filter Questions"}
+                      </span>
+                      {(commonFilters.chapters.length > 0 || commonFilters.topics.length > 0 || commonFilters.difficulty.length > 0 || commonFilters.marks.length > 0) && (
+                        <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-[10px]">
+                          {commonFilters.chapters.length + commonFilters.topics.length + commonFilters.difficulty.length + commonFilters.marks.length}
+                        </Badge>
+                      )}
+                    </Button>
                   </div>
 
                   <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
@@ -1264,192 +1298,358 @@ const CreateTestPage = () => {
 
               {/* Right Column: Selected Questions & Sections */}
               <div className="lg:col-span-6 h-full overflow-hidden flex flex-col">
-                <Card className="h-full flex flex-col overflow-hidden border-2 border-primary/10">
-                  <CardHeader className="pb-3 bg-muted/20">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">Test Structure</CardTitle>
-                        <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="secondary" className="font-mono">
-                            Total Marks: {getTotalMarks()}
-                          </Badge>
-                          <Badge variant="outline" className="font-mono">
-                            {selectedQuestions.length} Questions
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
-                          Save as Draft
-                        </Button>
-                        <Button onClick={handleSubmit} disabled={loading}>
-                          {loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
+                {showFilters ? (
+                  <Card className="h-full flex flex-col overflow-hidden border-2 border-primary/10">
+                    <CardHeader className="pb-3 bg-muted/20">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg">Filter Questions</CardTitle>
+                        <Button variant="ghost" size="sm" onClick={() => setShowFilters(false)}>
+                          <X className="h-4 w-4 mr-2" /> Close
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
-                    {/* Section Tabs */}
-                    <div className="px-4 pt-4 pb-2 border-b bg-background sticky top-0 z-10">
-                      <div className="flex items-center justify-between mb-2">
-                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sections</Label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setIsAddingSectionMode(true)}
-                          className="h-6 text-xs"
-                        >
-                          <Plus className="h-3 w-3 mr-1" /> Add Section
-                        </Button>
-                      </div>
-
-                      {isAddingSectionMode && (
-                        <div className="flex gap-2 mb-3 items-center bg-muted p-2 rounded-md">
-                          <Input
-                            value={newSectionName}
-                            onChange={(e) => setNewSectionName(e.target.value)}
-                            placeholder="Section Name"
-                            className="h-8 text-sm w-48"
-                            autoFocus
-                          />
-                          <Button size="sm" onClick={handleAddSection} className="h-8">Add</Button>
-                          <Button size="sm" variant="ghost" onClick={() => setIsAddingSectionMode(false)} className="h-8">Cancel</Button>
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-2">
-                        {sections.map(section => (
-                          <div
-                            key={section.id}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border transition-all cursor-pointer select-none group",
-                              selectedSectionForQuestion === section.id
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                                : "bg-background hover:bg-accent hover:text-accent-foreground"
-                            )}
-                            onClick={() => setSelectedSectionForQuestion(section.id)}
-                          >
-                            <Layers className="h-3 w-3" />
-                            {renamingSectionId === section.id ? (
-                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                <Input
-                                  value={renamingSectionName}
-                                  onChange={(e) => setRenamingSectionName(e.target.value)}
-                                  className="h-6 w-24 text-xs px-1 py-0 bg-background text-foreground"
-                                  autoFocus
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') handleSaveRenamedSection();
-                                    if (e.key === 'Escape') setRenamingSectionId(null);
-                                  }}
-                                />
-                                <Button size="icon" variant="ghost" className="h-5 w-5" onClick={handleSaveRenamedSection}>
-                                  <Check className="h-3 w-3" />
-                                </Button>
+                    </CardHeader>
+                    <CardContent className="flex-1 overflow-hidden p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+                        {/* Left Side: Chapters & Topics */}
+                        <div className="flex flex-col gap-4 h-full overflow-hidden">
+                          {/* Chapters */}
+                          <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                            <div className="flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                <Label className="font-semibold">Chapters</Label>
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">{commonFilters.chapters.length}</Badge>
                               </div>
-                            ) : (
-                              <>
-                                <span>{section.name}</span>
-                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <div
-                                    className="hover:bg-primary-foreground/20 rounded-full p-0.5"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStartRenamingSection(section);
+                              <div className="flex gap-2">
+                                <button onClick={selectAllChapters} className="text-[10px] text-primary hover:underline font-medium">Select All</button>
+                                <button onClick={deselectAllChapters} className="text-[10px] text-muted-foreground hover:underline">Clear</button>
+                              </div>
+                            </div>
+                            <div className="flex-1 border rounded-md p-3 overflow-y-auto bg-muted/5 space-y-3 dark:scrollbar-default dark:scrollbar-thin dark:scrollbar-thumb-slate-700 dark:scrollbar-track-transparent">
+                              {chapterOptions.map((option) => (
+                                <div key={option.value} className="flex items-start space-x-2">
+                                  <Checkbox
+                                    id={`chapter-${option.value}`}
+                                    checked={commonFilters.chapters.includes(option.value)}
+                                    onCheckedChange={(checked) => {
+                                      const newChapters = checked
+                                        ? [...commonFilters.chapters, option.value]
+                                        : commonFilters.chapters.filter((c) => c !== option.value);
+                                      setCommonFilters({ ...commonFilters, chapters: newChapters });
                                     }}
-                                  >
-                                    <Pencil className="h-3 w-3" />
+                                  />
+                                  <Label htmlFor={`chapter-${option.value}`} className="text-sm font-normal leading-tight cursor-pointer pt-0.5">
+                                    {option.label}
+                                  </Label>
+                                </div>
+                              ))}
+                              {chapterOptions.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No chapters available.</p>}
+                            </div>
+                          </div>
+
+                          {/* Topics */}
+                          <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                            <div className="flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                <Label className="font-semibold">Topics</Label>
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">{commonFilters.topics.length}</Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={selectAllTopics} className="text-[10px] text-primary hover:underline font-medium">Select All</button>
+                                <button onClick={deselectAllTopics} className="text-[10px] text-muted-foreground hover:underline">Clear</button>
+                              </div>
+                            </div>
+                            <div className="flex-1 border rounded-md p-3 overflow-y-auto bg-muted/5 space-y-3 dark:scrollbar-default dark:scrollbar-thin dark:scrollbar-thumb-slate-700 dark:scrollbar-track-transparent">
+                              {topicOptions.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+                                  <p className="text-sm">No topics available.</p>
+                                  <p className="text-xs mt-1">Select a chapter to view its topics.</p>
+                                </div>
+                              ) : (
+                                topicOptions.map((option) => (
+                                  <div key={option.value} className="flex items-start space-x-2">
+                                    <Checkbox
+                                      id={`topic-${option.value}`}
+                                      checked={commonFilters.topics.includes(option.value)}
+                                      onCheckedChange={(checked) => {
+                                        const newTopics = checked
+                                          ? [...commonFilters.topics, option.value]
+                                          : commonFilters.topics.filter((t) => t !== option.value);
+                                        setCommonFilters({ ...commonFilters, topics: newTopics });
+                                      }}
+                                    />
+                                    <Label htmlFor={`topic-${option.value}`} className="text-sm font-normal leading-tight cursor-pointer pt-0.5">
+                                      {option.label}
+                                    </Label>
                                   </div>
-                                  {section.id !== 'default' && (
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Side: Difficulty & Marks */}
+                        <div className="flex flex-col gap-4 h-full overflow-hidden">
+                          {/* Difficulty */}
+                          <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                            <div className="flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                <Label className="font-semibold">Difficulty</Label>
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">{commonFilters.difficulty.length}</Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={selectAllDifficulty} className="text-[10px] text-primary hover:underline font-medium">Select All</button>
+                                <button onClick={deselectAllDifficulty} className="text-[10px] text-muted-foreground hover:underline">Clear</button>
+                              </div>
+                            </div>
+                            <div className="flex-1 border rounded-md p-3 overflow-y-auto bg-muted/5 space-y-3 dark:scrollbar-default dark:scrollbar-thin dark:scrollbar-thumb-slate-700 dark:scrollbar-track-transparent">
+                              {[
+                                { label: 'Easy', value: 'easy' },
+                                { label: 'Medium', value: 'medium' },
+                                { label: 'Hard', value: 'hard' },
+                              ].map((option) => (
+                                <div key={option.value} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`diff-${option.value}`}
+                                    checked={commonFilters.difficulty.includes(option.value)}
+                                    onCheckedChange={(checked) => {
+                                      const newDiff = checked
+                                        ? [...commonFilters.difficulty, option.value]
+                                        : commonFilters.difficulty.filter((d) => d !== option.value);
+                                      setCommonFilters({ ...commonFilters, difficulty: newDiff });
+                                    }}
+                                  />
+                                  <Label htmlFor={`diff-${option.value}`} className="text-sm font-normal cursor-pointer capitalize">
+                                    {option.label}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Marks */}
+                          <div className="flex flex-col gap-2 flex-1 overflow-hidden">
+                            <div className="flex items-center justify-between px-1">
+                              <div className="flex items-center gap-2">
+                                <Label className="font-semibold">Marks</Label>
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1">{commonFilters.marks.length}</Badge>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={selectAllMarks} className="text-[10px] text-primary hover:underline font-medium">Select All</button>
+                                <button onClick={deselectAllMarks} className="text-[10px] text-muted-foreground hover:underline">Clear</button>
+                              </div>
+                            </div>
+                            <div className="flex-1 border rounded-md p-3 overflow-y-auto bg-muted/5 space-y-3 dark:scrollbar-default dark:scrollbar-thin dark:scrollbar-thumb-slate-700 dark:scrollbar-track-transparent">
+                              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '15', '20'].map((mark) => (
+                                <div key={mark} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`mark-${mark}`}
+                                    checked={commonFilters.marks.includes(mark)}
+                                    onCheckedChange={(checked) => {
+                                      const newMarks = checked
+                                        ? [...commonFilters.marks, mark]
+                                        : commonFilters.marks.filter((m) => m !== mark);
+                                      setCommonFilters({ ...commonFilters, marks: newMarks });
+                                    }}
+                                  />
+                                  <Label htmlFor={`mark-${mark}`} className="text-sm font-normal cursor-pointer">
+                                    {mark} Marks
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="h-full flex flex-col overflow-hidden border-2 border-primary/10">
+                    <CardHeader className="pb-3 bg-muted/20">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">Test Structure</CardTitle>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="secondary" className="font-mono">
+                              Total Marks: {getTotalMarks()}
+                            </Badge>
+                            <Badge variant="outline" className="font-mono">
+                              {selectedQuestions.length} Questions
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
+                            Save as Draft
+                          </Button>
+                          <Button onClick={handleSubmit} disabled={loading}>
+                            {loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
+                      {/* Section Tabs */}
+                      <div className="px-4 pt-4 pb-2 border-b bg-background sticky top-0 z-10">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sections</Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsAddingSectionMode(true)}
+                            className="h-6 text-xs"
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Add Section
+                          </Button>
+                        </div>
+
+                        {isAddingSectionMode && (
+                          <div className="flex gap-2 mb-3 items-center bg-muted p-2 rounded-md">
+                            <Input
+                              value={newSectionName}
+                              onChange={(e) => setNewSectionName(e.target.value)}
+                              placeholder="Section Name"
+                              className="h-8 text-sm w-48"
+                              autoFocus
+                            />
+                            <Button size="sm" onClick={handleAddSection} className="h-8">Add</Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsAddingSectionMode(false)} className="h-8">Cancel</Button>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-2">
+                          {sections.map(section => (
+                            <div
+                              key={section.id}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border transition-all cursor-pointer select-none group",
+                                selectedSectionForQuestion === section.id
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                  : "bg-background hover:bg-accent hover:text-accent-foreground"
+                              )}
+                              onClick={() => setSelectedSectionForQuestion(section.id)}
+                            >
+                              <Layers className="h-3 w-3" />
+                              {renamingSectionId === section.id ? (
+                                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <Input
+                                    value={renamingSectionName}
+                                    onChange={(e) => setRenamingSectionName(e.target.value)}
+                                    className="h-6 w-24 text-xs px-1 py-0 bg-background text-foreground"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleSaveRenamedSection();
+                                      if (e.key === 'Escape') setRenamingSectionId(null);
+                                    }}
+                                  />
+                                  <Button size="icon" variant="ghost" className="h-5 w-5" onClick={handleSaveRenamedSection}>
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span>{section.name}</span>
+                                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <div
                                       className="hover:bg-primary-foreground/20 rounded-full p-0.5"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleRemoveSection(section.id);
+                                        handleStartRenamingSection(section);
                                       }}
                                     >
-                                      <X className="h-3 w-3" />
+                                      <Pencil className="h-3 w-3" />
+                                    </div>
+                                    {section.id !== 'default' && (
+                                      <div
+                                        className="hover:bg-primary-foreground/20 rounded-full p-0.5"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleRemoveSection(section.id);
+                                        }}
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-2">
+                          Select a section above to view and manage its questions.
+                        </p>
+                      </div>
+
+                      {/* Questions List */}
+                      <div className="flex-1 overflow-y-auto p-4 bg-muted/10">
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleDragEnd}
+                        >
+                          {sections.map(section => {
+                            const sectionQuestions = selectedQuestions.filter(q => q.section === section.id);
+                            // Only show the selected section
+                            if (section.id !== selectedSectionForQuestion) return null;
+
+                            return (
+                              <div key={section.id} className="mb-6 last:mb-0">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <div className="h-px flex-1 bg-border" />
+                                  <span className="text-sm font-medium text-muted-foreground px-2 bg-background border rounded-full">
+                                    {section.name} <span className="text-xs opacity-70">({sectionQuestions.length})</span>
+                                  </span>
+                                  <div className="h-px flex-1 bg-border" />
+                                </div>
+
+                                <div className="space-y-2 min-h-[50px]">
+                                  <SortableContext
+                                    items={sectionQuestions.map(q => q.question)}
+                                    strategy={verticalListSortingStrategy}
+                                  >
+                                    {sectionQuestions.map((sq, idx) => {
+                                      const q = getQuestionDetails(sq.question);
+                                      if (!q) return null;
+
+                                      return (
+                                        <SortableQuestionItem
+                                          key={sq.question}
+                                          id={sq.question}
+                                          question={q}
+                                          index={idx}
+                                          onRemove={handleRemoveQuestion}
+                                          onUpdateMarks={handleUpdateMarks}
+                                          onMoveToSection={handleMoveQuestionToSection}
+                                          sections={sections}
+                                          sectionId={sq.section || 'default'}
+                                        />
+                                      );
+                                    })}
+                                  </SortableContext>
+                                  {sectionQuestions.length === 0 && (
+                                    <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
+                                      <p className="text-sm">No questions in this section.</p>
+                                      <p className="text-xs mt-1">Select questions from the left panel to add them here.</p>
                                     </div>
                                   )}
                                 </div>
-                              </>
-                            )}
+                              </div>
+                            );
+                          })}
+                        </DndContext>
+
+                        {selectedQuestions.length === 0 && (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
+                            <Layers className="h-12 w-12 mb-4" />
+                            <p>No questions added yet.</p>
+                            <p className="text-sm">Select questions from the left panel to build your test.</p>
                           </div>
-                        ))}
+                        )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-2">
-                        Select a section above to view and manage its questions.
-                      </p>
-                    </div>
-
-                    {/* Questions List */}
-                    <div className="flex-1 overflow-y-auto p-4 bg-muted/10">
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}
-                      >
-                        {sections.map(section => {
-                          const sectionQuestions = selectedQuestions.filter(q => q.section === section.id);
-                          // Only show the selected section
-                          if (section.id !== selectedSectionForQuestion) return null;
-
-                          return (
-                            <div key={section.id} className="mb-6 last:mb-0">
-                              <div className="flex items-center gap-2 mb-3">
-                                <div className="h-px flex-1 bg-border" />
-                                <span className="text-sm font-medium text-muted-foreground px-2 bg-background border rounded-full">
-                                  {section.name} <span className="text-xs opacity-70">({sectionQuestions.length})</span>
-                                </span>
-                                <div className="h-px flex-1 bg-border" />
-                              </div>
-
-                              <div className="space-y-2 min-h-[50px]">
-                                <SortableContext
-                                  items={sectionQuestions.map(q => q.question)}
-                                  strategy={verticalListSortingStrategy}
-                                >
-                                  {sectionQuestions.map((sq, idx) => {
-                                    const q = getQuestionDetails(sq.question);
-                                    if (!q) return null;
-
-                                    return (
-                                      <SortableQuestionItem
-                                        key={sq.question}
-                                        id={sq.question}
-                                        question={q}
-                                        index={idx}
-                                        onRemove={handleRemoveQuestion}
-                                        onUpdateMarks={handleUpdateMarks}
-                                        onMoveToSection={handleMoveQuestionToSection}
-                                        sections={sections}
-                                        sectionId={sq.section || 'default'}
-                                      />
-                                    );
-                                  })}
-                                </SortableContext>
-                                {sectionQuestions.length === 0 && (
-                                  <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
-                                    <p className="text-sm">No questions in this section.</p>
-                                    <p className="text-xs mt-1">Select questions from the left panel to add them here.</p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </DndContext>
-
-                      {selectedQuestions.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
-                          <Layers className="h-12 w-12 mb-4" />
-                          <p>No questions added yet.</p>
-                          <p className="text-sm">Select questions from the left panel to build your test.</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
           </TabsContent>

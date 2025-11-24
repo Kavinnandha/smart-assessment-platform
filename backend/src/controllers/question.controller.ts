@@ -23,21 +23,33 @@ export const createQuestion = async (req: AuthRequest, res: Response) => {
 
 export const getQuestions = async (req: AuthRequest, res: Response) => {
   try {
-    const { chapter, topic, difficultyLevel, subject, search, minMarks, maxMarks } = req.query;
-    
+    const { chapter, topic, difficultyLevel, subject, search, minMarks, maxMarks, marks } = req.query;
+
     const filter: any = {};
-    if (chapter) filter.chapter = chapter;
-    if (topic) filter.topic = topic;
-    if (difficultyLevel) filter.difficultyLevel = difficultyLevel;
+    if (chapter) {
+      const chapters = Array.isArray(chapter) ? chapter : (chapter as string).split(',');
+      filter.chapter = { $in: chapters };
+    }
+    if (topic) {
+      const topics = Array.isArray(topic) ? topic : (topic as string).split(',');
+      filter.topic = { $in: topics };
+    }
+    if (difficultyLevel) {
+      const levels = Array.isArray(difficultyLevel) ? difficultyLevel : (difficultyLevel as string).split(',');
+      filter.difficultyLevel = { $in: levels };
+    }
     if (subject) filter.subject = subject;
-    
+
     // Handle marks filtering
-    if (minMarks || maxMarks) {
+    if (marks) {
+      const marksList = Array.isArray(marks) ? marks : (marks as string).split(',');
+      filter.marks = { $in: marksList.map(m => Number(m)) };
+    } else if (minMarks || maxMarks) {
       filter.marks = {};
       if (minMarks) filter.marks.$gte = parseInt(minMarks as string);
       if (maxMarks) filter.marks.$lte = parseInt(maxMarks as string);
     }
-    
+
     if (search) {
       filter.$or = [
         { questionText: { $regex: search, $options: 'i' } }
@@ -47,10 +59,10 @@ export const getQuestions = async (req: AuthRequest, res: Response) => {
     // If user is a teacher, filter questions based on assigned subjects
     if (req.user?.role === UserRole.TEACHER) {
       // Find all groups where the teacher is assigned
-      const teacherGroups = await Group.find({ 
-        teachers: req.user.userId 
+      const teacherGroups = await Group.find({
+        teachers: req.user.userId
       }).distinct('subject');
-      
+
       // Add subject filter to only show questions from assigned subjects
       filter.subject = { $in: teacherGroups };
     }
@@ -142,9 +154,9 @@ export const importQuestions = async (req: AuthRequest, res: Response) => {
     }));
 
     const created = await Question.insertMany(questions);
-    res.status(201).json({ 
-      message: `${created.length} questions imported successfully`, 
-      count: created.length 
+    res.status(201).json({
+      message: `${created.length} questions imported successfully`,
+      count: created.length
     });
   } catch (error) {
     console.error('Import questions error:', error);
@@ -158,7 +170,7 @@ export const exportQuestions = async (req: AuthRequest, res: Response) => {
     const filter: any = {};
     if (subject) filter.subject = subject;
     if (chapter) filter.chapter = chapter;
-    
+
     // Handle marks filtering
     if (minMarks || maxMarks) {
       filter.marks = {};
