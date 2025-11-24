@@ -20,6 +20,8 @@ import ReportsPage from './pages/reports/ReportsPage';
 import UsersPage from './pages/admin/UsersPage';
 import SubjectsPage from './pages/admin/SubjectsPage';
 import StudentGroupsPage from './pages/groups/StudentGroupsPage';
+import ProfilePage from './pages/ProfilePage';
+import { BreadcrumbProvider } from '@/contexts/BreadcrumbContext';
 
 const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: string[] }) => {
   const { user, loading } = useAuth();
@@ -44,7 +46,7 @@ function AppRoutes() {
 
   const getDashboard = () => {
     if (!user) return <Navigate to="/login" />;
-    
+
     switch (user.role) {
       case 'student':
         return <StudentDashboard />;
@@ -61,12 +63,12 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <LoginPage />} />
       <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <RegisterPage />} />
-      
+
       <Route path="/" element={<Navigate to="/dashboard" />} />
-      
+
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={getDashboard()} />
-        
+
         {/* Question Routes */}
         <Route path="/questions" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><QuestionsPage /></ProtectedRoute>} />
         <Route path="/questions/subject/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><SubjectQuestionsPage /></ProtectedRoute>} />
@@ -74,7 +76,7 @@ function AppRoutes() {
         <Route path="/questions/create/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
         <Route path="/questions/edit/:id" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
         <Route path="/questions/edit/:id/:subjectId" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateQuestionPage /></ProtectedRoute>} />
-        
+
         {/* Test Routes */}
         <Route path="/tests" element={<TestsPage />} />
         <Route path="/tests/create" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><CreateTestPage /></ProtectedRoute>} />
@@ -83,16 +85,19 @@ function AppRoutes() {
         <Route path="/tests/take/:id" element={<ProtectedRoute allowedRoles={['student']}><TakeTestPage /></ProtectedRoute>} />
         <Route path="/tests/submissions" element={<ProtectedRoute allowedRoles={['teacher', 'admin', 'student']}><SubmissionsPage /></ProtectedRoute>} />
         <Route path="/tests/submissions/evaluate/:id" element={<EvaluatePage />} />
-        
+
         {/* Reports */}
         <Route path="/reports" element={<ReportsPage />} />
-        
+
         {/* Admin Routes */}
         <Route path="/users" element={<ProtectedRoute allowedRoles={['admin']}><UsersPage /></ProtectedRoute>} />
         <Route path="/subjects" element={<ProtectedRoute allowedRoles={['admin']}><SubjectsPage /></ProtectedRoute>} />
-        
+
         {/* Student Groups */}
         <Route path="/student-groups" element={<ProtectedRoute allowedRoles={['teacher', 'admin']}><StudentGroupsPage /></ProtectedRoute>} />
+
+        {/* Profile */}
+        <Route path="/profile" element={<ProfilePage />} />
       </Route>
     </Routes>
   );
@@ -103,7 +108,9 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="smart-assessment-theme">
       <AuthProvider>
         <Router>
-          <AppRoutes />
+          <BreadcrumbProvider>
+            <AppRoutes />
+          </BreadcrumbProvider>
         </Router>
       </AuthProvider>
     </ThemeProvider>

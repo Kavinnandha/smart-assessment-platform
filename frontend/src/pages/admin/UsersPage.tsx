@@ -10,6 +10,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { toast } from 'sonner';
 import api from '@/lib/api';
 
 interface Teacher {
@@ -143,8 +161,11 @@ const UsersPage = () => {
 
       await fetchUsers();
       handleCloseDialog();
+      toast.success(editingUser ? 'User updated successfully' : 'User created successfully');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save user');
+      const errorMessage = err.response?.data?.message || 'Failed to save user';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -168,8 +189,11 @@ const UsersPage = () => {
       await api.delete(`/users/${deletingUser._id}`);
       await fetchUsers();
       handleCloseDeleteDialog();
+      toast.success('User deleted successfully');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to delete user');
+      const errorMessage = err.response?.data?.message || 'Failed to delete user';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -202,14 +226,14 @@ const UsersPage = () => {
   };
 
   const getAssignedGroups = (teacherId: string) => {
-    return groups.filter(group => 
+    return groups.filter(group =>
       group.teachers.some(teacher => teacher._id === teacherId)
     );
   };
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -249,16 +273,20 @@ const UsersPage = () => {
           />
         </div>
         <div className="w-48">
-          <select
+          <Select
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            onValueChange={setRoleFilter}
           >
-            <option value="all">All Roles</option>
-            <option value="admin">Admin</option>
-            <option value="teacher">Teacher</option>
-            <option value="student">Student</option>
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Filter by Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="teacher">Teacher</SelectItem>
+              <SelectItem value="student">Student</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -367,7 +395,7 @@ const UsersPage = () => {
                               {assignedGroups.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {assignedGroups.map(group => (
-                                    <span 
+                                    <span
                                       key={group._id}
                                       className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium border border-purple-200 dark:border-purple-800"
                                     >
@@ -421,9 +449,8 @@ const UsersPage = () => {
         </div>
       </div>
 
-      {/* Create/Edit User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
           <DialogHeader>
             <DialogTitle>{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
             <DialogDescription>
@@ -469,16 +496,19 @@ const UsersPage = () => {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Role</label>
-              <select
-                required
+              <Select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                onValueChange={(value: any) => setFormData({ ...formData, role: value })}
               >
-                <option value="student">Student</option>
-                <option value="teacher">Teacher</option>
-                <option value="admin">Admin</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="teacher">Teacher</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button
@@ -498,42 +528,33 @@ const UsersPage = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete this user? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           {deletingUser && (
-            <div className="bg-gray-50 p-4 rounded-md">
+            <div className="bg-muted p-4 rounded-md">
               <p className="font-medium">{deletingUser.name}</p>
-              <p className="text-sm text-gray-600">{deletingUser.email}</p>
-              <p className="text-sm text-gray-600">Role: {deletingUser.role}</p>
+              <p className="text-sm text-muted-foreground">{deletingUser.email}</p>
+              <p className="text-sm text-muted-foreground">Role: {deletingUser.role}</p>
             </div>
           )}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCloseDeleteDialog}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCloseDeleteDialog}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
               onClick={handleDelete}
-              disabled={submitting}
               className="bg-red-600 hover:bg-red-700"
+              disabled={submitting}
             >
               {submitting ? 'Deleting...' : 'Delete User'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

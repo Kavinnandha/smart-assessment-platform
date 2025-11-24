@@ -1,16 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Plus, Search, Trash2, BookOpen, Eye, File } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Trash2, BookOpen, Eye, File, X } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
+import { MultiSelect } from "@/components/ui/multi-select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface Chapter {
   name: string;
@@ -26,26 +35,45 @@ interface Subject {
 const SubjectQuestionsPage = () => {
   const { subjectId } = useParams<{ subjectId: string }>();
   const navigate = useNavigate();
-  const [questions, setQuestions] = useState([]);
+  const [allQuestions, setAllQuestions] = useState<any[]>([]);
   const [subject, setSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState({ chapter: '', topic: '', difficulty: '' });
+
+  // Filters
+  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
+  const [selectedMarks, setSelectedMarks] = useState<string[]>([]);
+
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
+
+  const { setLabel } = useBreadcrumb();
 
   // Get API base URL for file attachments
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
 
   useEffect(() => {
-    fetchSubjectAndQuestions();
-  }, [subjectId, filter]);
+    const timer = setTimeout(() => {
+      fetchSubjectAndQuestions();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [subjectId, search]); // Re-fetch on search change, but filter locally for others
+
+  useEffect(() => {
+    if (subject && subject._id !== 'uncategorized') {
+      setLabel(subject._id, subject.name);
+    }
+  }, [subject, setLabel]);
 
   const fetchSubjectAndQuestions = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch subject details
       if (subjectId && subjectId !== 'uncategorized') {
         const subjectResponse = await api.get(`/subjects/${subjectId}`);
@@ -55,45 +83,97 @@ const SubjectQuestionsPage = () => {
       }
 
       // Fetch questions for this subject
-      const params: any = { ...filter, search };
+      // We fetch all questions matching the search, then filter client-side for facets
+      const params: any = { search };
+
       if (subjectId !== 'uncategorized') {
         params.subject = subjectId;
       }
-      
+
       const questionsResponse = await api.get('/questions', { params });
-      
-      // Filter questions by subject
-      const filteredQuestions = questionsResponse.data.questions.filter((q: any) => {
+
+      // Filter questions by subject (double check)
+      const fetchedQuestions = questionsResponse.data.questions.filter((q: any) => {
         if (subjectId === 'uncategorized') {
           return !q.subject || !q.subject._id;
         }
         return q.subject?._id === subjectId;
       });
-      
-      setQuestions(filteredQuestions);
+
+      setAllQuestions(fetchedQuestions);
     } catch (error) {
       console.error('Failed to fetch questions:', error);
+      toast.error('Failed to fetch questions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearch = () => {
-    fetchSubjectAndQuestions();
+  // Derive options for filters
+  const chapterOptions = useMemo(() => {
+    return subject?.chapters?.map(c => ({ label: c.name, value: c.name })) || [];
+  }, [subject]);
+
+  const topicOptions = useMemo(() => {
+    const topics = new Set<string>();
+    if (selectedChapters.length > 0) {
+      subject?.chapters?.forEach(c => {
+        if (selectedChapters.includes(c.name)) {
+          c.topics.forEach(t => topics.add(t));
+        }
+      });
+    } else {
+      subject?.chapters?.forEach(c => {
+        c.topics.forEach(t => topics.add(t));
+      });
+    }
+    return Array.from(topics).map(t => ({ label: t, value: t }));
+  }, [subject, selectedChapters]);
+
+  const difficultyOptions = [
+    { label: 'Easy', value: 'easy' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'Hard', value: 'hard' },
+  ];
+
+  const markOptions = useMemo(() => {
+    const marks = new Set<string>();
+    allQuestions.forEach(q => marks.add(q.marks.toString()));
+    return Array.from(marks).sort((a, b) => parseInt(a) - parseInt(b)).map(m => ({ label: m, value: m }));
+  }, [allQuestions]);
+
+  // Filter questions client-side
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter(q => {
+      const matchesChapter = selectedChapters.length === 0 || selectedChapters.includes(q.chapter);
+      const matchesTopic = selectedTopics.length === 0 || selectedTopics.includes(q.topic);
+      const matchesDifficulty = selectedDifficulties.length === 0 || selectedDifficulties.includes(q.difficultyLevel);
+      const matchesMarks = selectedMarks.length === 0 || selectedMarks.includes(q.marks.toString());
+      return matchesChapter && matchesTopic && matchesDifficulty && matchesMarks;
+    });
+  }, [allQuestions, selectedChapters, selectedTopics, selectedDifficulties, selectedMarks]);
+
+  const handleOpenDeleteDialog = (id: string) => {
+    setDeletingQuestionId(id);
+    setIsDeleteDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this question?')) {
-      return;
-    }
+  const handleCloseDeleteDialog = () => {
+    setIsDeleteDialogOpen(false);
+    setDeletingQuestionId(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingQuestionId) return;
 
     try {
-      await api.delete(`/questions/${id}`);
-      alert('Question deleted successfully');
+      await api.delete(`/questions/${deletingQuestionId}`);
+      toast.success('Question deleted successfully');
       fetchSubjectAndQuestions();
+      handleCloseDeleteDialog();
     } catch (error) {
       console.error('Failed to delete question:', error);
-      alert('Failed to delete question');
+      toast.error('Failed to delete question');
     }
   };
 
@@ -104,7 +184,7 @@ const SubjectQuestionsPage = () => {
       setViewDetailsOpen(true);
     } catch (error) {
       console.error('Failed to fetch question details:', error);
-      alert('Failed to load question details');
+      toast.error('Failed to load question details');
     }
   };
 
@@ -198,7 +278,7 @@ const SubjectQuestionsPage = () => {
 
     return (
       <div className="text-base whitespace-pre-wrap">
-        {parts.map((part, idx) => 
+        {parts.map((part, idx) =>
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
       </div>
@@ -289,7 +369,7 @@ const SubjectQuestionsPage = () => {
 
     return (
       <div className="text-base whitespace-pre-wrap text-green-900 dark:text-green-400">
-        {parts.map((part, idx) => 
+        {parts.map((part, idx) =>
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
       </div>
@@ -326,7 +406,7 @@ const SubjectQuestionsPage = () => {
           </div>
         )}
         <div className={`p-2 border-t ${borderColor} ${bgColor}`}>
-          <a 
+          <a
             href={fileUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -343,24 +423,36 @@ const SubjectQuestionsPage = () => {
   };
 
   // Group questions by chapter
-  const questionsByChapter = questions.reduce((acc: any, question: any) => {
-    const chapterName = question.chapter || 'No Chapter';
-    
-    if (!acc[chapterName]) {
-      acc[chapterName] = [];
-    }
-    
-    acc[chapterName].push(question);
-    return acc;
-  }, {});
+  const questionsByChapter = useMemo(() => {
+    return filteredQuestions.reduce((acc: any, question: any) => {
+      const chapterName = question.chapter || 'No Chapter';
+
+      if (!acc[chapterName]) {
+        acc[chapterName] = [];
+      }
+
+      acc[chapterName].push(question);
+      return acc;
+    }, {});
+  }, [filteredQuestions]);
+
+  const clearFilters = () => {
+    setSelectedChapters([]);
+    setSelectedTopics([]);
+    setSelectedDifficulties([]);
+    setSelectedMarks([]);
+    setSearch('');
+  };
+
+  const hasActiveFilters = search || selectedChapters.length > 0 || selectedTopics.length > 0 || selectedDifficulties.length > 0 || selectedMarks.length > 0;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => navigate('/questions')}
             className="gap-2"
@@ -374,7 +466,7 @@ const SubjectQuestionsPage = () => {
             </div>
             <div>
               <h1 className="text-3xl font-bold">{subject?.name || 'Loading...'}</h1>
-              <p className="text-muted-foreground mt-1">{questions.length} question{questions.length !== 1 ? 's' : ''}</p>
+              <p className="text-muted-foreground mt-1">{filteredQuestions.length} question{filteredQuestions.length !== 1 ? 's' : ''}</p>
             </div>
           </div>
         </div>
@@ -389,67 +481,77 @@ const SubjectQuestionsPage = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-card p-4 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="md:col-span-2">
-            <Input
-              placeholder="Search questions..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search questions by name or topic..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" onClick={clearFilters} className="shrink-0 text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4 mr-2" />
+                Clear Filters
+              </Button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <MultiSelect
+              options={chapterOptions}
+              selected={selectedChapters}
+              onChange={setSelectedChapters}
+              placeholder="Select Chapters"
+            />
+            <MultiSelect
+              options={topicOptions}
+              selected={selectedTopics}
+              onChange={setSelectedTopics}
+              placeholder="Select Topics"
+            />
+            <MultiSelect
+              options={difficultyOptions}
+              selected={selectedDifficulties}
+              onChange={setSelectedDifficulties}
+              placeholder="Select Difficulty"
+            />
+            <MultiSelect
+              options={markOptions}
+              selected={selectedMarks}
+              onChange={setSelectedMarks}
+              placeholder="Select Marks"
             />
           </div>
-          <select
-            value={filter.difficulty}
-            onChange={(e) => setFilter({ ...filter, difficulty: e.target.value })}
-            className="px-3 py-2 border rounded-md bg-background"
-          >
-            <option value="">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </select>
-          <select
-            value={filter.chapter}
-            onChange={(e) => setFilter({ ...filter, chapter: e.target.value })}
-            className="px-3 py-2 border rounded-md bg-background"
-          >
-            <option value="">All Chapters</option>
-            {subject?.chapters?.map((chapter: Chapter, idx: number) => (
-              <option key={idx} value={chapter.name}>
-                {chapter.name}
-              </option>
-            ))}
-          </select>
-          <Button onClick={handleSearch}>
-            <Search className="h-4 w-4 mr-2" />
-            Search
-          </Button>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card p-4 rounded-lg shadow-sm border">
           <p className="text-sm text-muted-foreground">Total Questions</p>
-          <p className="text-2xl font-bold">{questions.length}</p>
+          <p className="text-2xl font-bold">{filteredQuestions.length}</p>
         </div>
         <div className="bg-card p-4 rounded-lg shadow-sm border">
           <p className="text-sm text-muted-foreground">Easy</p>
           <p className="text-2xl font-bold text-green-600">
-            {questions.filter((q: any) => q.difficultyLevel === 'easy').length}
+            {filteredQuestions.filter((q: any) => q.difficultyLevel === 'easy').length}
           </p>
         </div>
         <div className="bg-card p-4 rounded-lg shadow-sm border">
           <p className="text-sm text-muted-foreground">Medium</p>
           <p className="text-2xl font-bold text-yellow-600">
-            {questions.filter((q: any) => q.difficultyLevel === 'medium').length}
+            {filteredQuestions.filter((q: any) => q.difficultyLevel === 'medium').length}
           </p>
         </div>
         <div className="bg-card p-4 rounded-lg shadow-sm border">
           <p className="text-sm text-muted-foreground">Hard</p>
           <p className="text-2xl font-bold text-red-600">
-            {questions.filter((q: any) => q.difficultyLevel === 'hard').length}
+            {filteredQuestions.filter((q: any) => q.difficultyLevel === 'hard').length}
           </p>
         </div>
       </div>
@@ -461,9 +563,9 @@ const SubjectQuestionsPage = () => {
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             <p className="mt-2 text-muted-foreground">Loading questions...</p>
           </div>
-        ) : questions.length === 0 ? (
+        ) : filteredQuestions.length === 0 ? (
           <div className="bg-card p-8 rounded-lg shadow text-center text-muted-foreground">
-            No questions found for this subject
+            No questions found matching your filters
           </div>
         ) : (
           Object.entries(questionsByChapter).map(([chapter, chapterQuestions]: [string, any]) => (
@@ -481,7 +583,7 @@ const SubjectQuestionsPage = () => {
                 <table className="min-w-full divide-y divide-border">
                   <thead className="bg-muted/30">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Question No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase w-1/2">Question</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Topic</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Difficulty</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Marks</th>
@@ -491,22 +593,22 @@ const SubjectQuestionsPage = () => {
                   <tbody className="bg-card divide-y divide-border">
                     {chapterQuestions.map((q: any) => (
                       <tr key={q._id} className="hover:bg-muted/20">
-                        <td className="px-6 py-4 whitespace-nowrap font-medium">{`Q${chapterQuestions.indexOf(q) + 1}`}</td>
+                        <td className="px-6 py-4">
+                          <div className="line-clamp-2 font-medium" title={q.questionText}>
+                            {q.questionText}
+                          </div>
+                        </td>
                         <td className="px-6 py-4">{q.topic || '-'}</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            q.difficultyLevel === 'easy' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
-                            q.difficultyLevel === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' :
-                            'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                          }`}>
+                          <Badge variant={q.difficultyLevel === 'easy' ? 'secondary' : q.difficultyLevel === 'medium' ? 'default' : 'destructive'} className="capitalize">
                             {q.difficultyLevel}
-                          </span>
+                          </Badge>
                         </td>
                         <td className="px-6 py-4">{q.marks}</td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleViewDetails(q._id)}
                               className="gap-1"
@@ -517,10 +619,10 @@ const SubjectQuestionsPage = () => {
                             <Link to={`/questions/edit/${q._id}/${subjectId}`}>
                               <Button size="sm" variant="outline">Edit</Button>
                             </Link>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => handleDelete(q._id)}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenDeleteDialog(q._id)}
                               className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -537,18 +639,18 @@ const SubjectQuestionsPage = () => {
         )}
       </div>
 
-      {/* View Details Dialog */}
-      <Dialog open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Question Details</DialogTitle>
-            <DialogDescription>
+      {/* View Details Sheet */}
+      <Sheet open={viewDetailsOpen} onOpenChange={setViewDetailsOpen}>
+        <SheetContent className="w-full sm:max-w-4xl overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <SheetHeader>
+            <SheetTitle className="text-2xl">Question Details</SheetTitle>
+            <SheetDescription>
               Complete information about this question including attachments and answer
-            </DialogDescription>
-          </DialogHeader>
-          
+            </SheetDescription>
+          </SheetHeader>
+
           {selectedQuestion && (
-            <div className="space-y-6 mt-4">
+            <div className="space-y-6 mt-6 px-4">
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                 <div>
@@ -561,11 +663,10 @@ const SubjectQuestionsPage = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Difficulty</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                    selectedQuestion.difficultyLevel === 'easy' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
+                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${selectedQuestion.difficultyLevel === 'easy' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
                     selectedQuestion.difficultyLevel === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' :
-                    'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                  }`}>
+                      'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                    }`}>
                     {selectedQuestion.difficultyLevel}
                   </span>
                 </div>
@@ -590,60 +691,60 @@ const SubjectQuestionsPage = () => {
               </div>
 
               {/* Question Attachments - Only show separately if not using custom positioning */}
-              {selectedQuestion.attachments && 
-               selectedQuestion.attachments.length > 0 && 
-               selectedQuestion.attachmentPosition !== 'custom' &&
-               selectedQuestion.attachmentPosition !== 'before' &&
-               selectedQuestion.attachmentPosition !== 'after' && (
-                <div className="p-4 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-blue-900 dark:text-blue-400">
-                      Question Attachments ({selectedQuestion.attachments.length})
-                    </p>
-                    {selectedQuestion.attachmentPosition && (
-                      <span className="text-xs px-2 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded">
-                        Position: {selectedQuestion.attachmentPosition}
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedQuestion.attachments.map((attachment: any, idx: number) => {
-                      const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
-                      return (
-                        <div key={idx} className="border border-blue-300 dark:border-blue-700 rounded-lg overflow-hidden bg-card">
-                          {attachment.fileType.startsWith('image/') ? (
-                            <div className="relative h-40 bg-muted/30 flex items-center justify-center">
-                              <img
-                                src={fileUrl}
-                                alt={attachment.fileName}
-                                className="max-w-full max-h-full object-contain"
-                                loading="lazy"
-                              />
+              {selectedQuestion.attachments &&
+                selectedQuestion.attachments.length > 0 &&
+                selectedQuestion.attachmentPosition !== 'custom' &&
+                selectedQuestion.attachmentPosition !== 'before' &&
+                selectedQuestion.attachmentPosition !== 'after' && (
+                  <div className="p-4 border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-400">
+                        Question Attachments ({selectedQuestion.attachments.length})
+                      </p>
+                      {selectedQuestion.attachmentPosition && (
+                        <span className="text-xs px-2 py-1 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded">
+                          Position: {selectedQuestion.attachmentPosition}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedQuestion.attachments.map((attachment: any, idx: number) => {
+                        const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                        return (
+                          <div key={idx} className="border border-blue-300 dark:border-blue-700 rounded-lg overflow-hidden bg-card">
+                            {attachment.fileType.startsWith('image/') ? (
+                              <div className="relative h-40 bg-muted/30 flex items-center justify-center">
+                                <img
+                                  src={fileUrl}
+                                  alt={attachment.fileName}
+                                  className="max-w-full max-h-full object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center h-40 bg-muted/30">
+                                <File className="w-12 h-12 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="p-2 border-t border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-blue-900 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate block"
+                              >
+                                {attachment.fileName}
+                              </a>
+                              <p className="text-xs text-blue-700 dark:text-blue-500">
+                                {formatFileSize(attachment.fileSize)}
+                              </p>
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-40 bg-muted/30">
-                              <File className="w-12 h-12 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="p-2 border-t border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                            <a 
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-medium text-blue-900 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 truncate block"
-                            >
-                              {attachment.fileName}
-                            </a>
-                            <p className="text-xs text-blue-700 dark:text-blue-500">
-                              {formatFileSize(attachment.fileSize)}
-                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Options (for MCQ and True/False) */}
               {selectedQuestion.options && selectedQuestion.options.length > 0 && (
@@ -651,13 +752,12 @@ const SubjectQuestionsPage = () => {
                   <p className="text-sm font-medium mb-3">Options</p>
                   <div className="space-y-2">
                     {selectedQuestion.options.map((option: string, idx: number) => (
-                      <div 
-                        key={idx} 
-                        className={`p-3 rounded-lg ${
-                          option === selectedQuestion.correctAnswer 
-                            ? 'bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700' 
-                            : 'bg-muted/30 border'
-                        }`}
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg ${option === selectedQuestion.correctAnswer
+                          ? 'bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-700'
+                          : 'bg-muted/30 border'
+                          }`}
                       >
                         <span className="font-medium">{String.fromCharCode(65 + idx)}.</span> {option}
                         {option === selectedQuestion.correctAnswer && (
@@ -680,60 +780,60 @@ const SubjectQuestionsPage = () => {
               </div>
 
               {/* Correct Answer Attachments - Only show separately if not using custom positioning */}
-              {selectedQuestion.correctAnswerAttachments && 
-               selectedQuestion.correctAnswerAttachments.length > 0 && 
-               selectedQuestion.correctAnswerAttachmentPosition !== 'custom' &&
-               selectedQuestion.correctAnswerAttachmentPosition !== 'before' &&
-               selectedQuestion.correctAnswerAttachmentPosition !== 'after' && (
-                <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-green-900 dark:text-green-400">
-                      Answer Attachments ({selectedQuestion.correctAnswerAttachments.length})
-                    </p>
-                    {selectedQuestion.correctAnswerAttachmentPosition && (
-                      <span className="text-xs px-2 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 rounded">
-                        Position: {selectedQuestion.correctAnswerAttachmentPosition}
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedQuestion.correctAnswerAttachments.map((attachment: any, idx: number) => {
-                      const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
-                      return (
-                        <div key={idx} className="border border-green-300 dark:border-green-700 rounded-lg overflow-hidden bg-card">
-                          {attachment.fileType.startsWith('image/') ? (
-                            <div className="relative h-40 bg-muted/30 flex items-center justify-center">
-                              <img
-                                src={fileUrl}
-                                alt={attachment.fileName}
-                                className="max-w-full max-h-full object-contain"
-                                loading="lazy"
-                              />
+              {selectedQuestion.correctAnswerAttachments &&
+                selectedQuestion.correctAnswerAttachments.length > 0 &&
+                selectedQuestion.correctAnswerAttachmentPosition !== 'custom' &&
+                selectedQuestion.correctAnswerAttachmentPosition !== 'before' &&
+                selectedQuestion.correctAnswerAttachmentPosition !== 'after' && (
+                  <div className="p-4 border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-green-900 dark:text-green-400">
+                        Answer Attachments ({selectedQuestion.correctAnswerAttachments.length})
+                      </p>
+                      {selectedQuestion.correctAnswerAttachmentPosition && (
+                        <span className="text-xs px-2 py-1 bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200 rounded">
+                          Position: {selectedQuestion.correctAnswerAttachmentPosition}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedQuestion.correctAnswerAttachments.map((attachment: any, idx: number) => {
+                        const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                        return (
+                          <div key={idx} className="border border-green-300 dark:border-green-700 rounded-lg overflow-hidden bg-card">
+                            {attachment.fileType.startsWith('image/') ? (
+                              <div className="relative h-40 bg-muted/30 flex items-center justify-center">
+                                <img
+                                  src={fileUrl}
+                                  alt={attachment.fileName}
+                                  className="max-w-full max-h-full object-contain"
+                                  loading="lazy"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-center h-40 bg-muted/30">
+                                <File className="w-12 h-12 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="p-2 border-t border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-medium text-green-900 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 truncate block"
+                              >
+                                {attachment.fileName}
+                              </a>
+                              <p className="text-xs text-green-700 dark:text-green-500">
+                                {formatFileSize(attachment.fileSize)}
+                              </p>
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-40 bg-muted/30">
-                              <File className="w-12 h-12 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div className="p-2 border-t border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
-                            <a 
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs font-medium text-green-900 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 truncate block"
-                            >
-                              {attachment.fileName}
-                            </a>
-                            <p className="text-xs text-green-700 dark:text-green-500">
-                              {formatFileSize(attachment.fileSize)}
-                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Footer Info */}
               <div className="pt-4 border-t text-sm text-muted-foreground">
@@ -745,8 +845,29 @@ const SubjectQuestionsPage = () => {
               </div>
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Question</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this question? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCloseDeleteDialog}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Question
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

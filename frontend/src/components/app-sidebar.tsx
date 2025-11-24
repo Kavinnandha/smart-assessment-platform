@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useNavigate, Link, useLocation } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
 import {
   LayoutDashboard,
@@ -33,65 +33,102 @@ import {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   // Define navigation items based on user role
+  // Define navigation items based on user role
   const getNavItems = () => {
-    const commonItems = [
-      {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-        isActive: true,
-      },
-      {
-        title: "Tests",
-        url: "/tests",
-        icon: ClipboardList,
-      },
-      {
-        title: "Reports",
-        url: "/reports",
-        icon: BarChart3,
-      },
-    ]
+    const currentPath = location.pathname;
 
-    const teacherAdminItems = [
-      {
-        title: "Questions",
-        url: "/questions",
-        icon: FileQuestion,
-      },
-      {
-        title: "Student Groups",
-        url: "/student-groups",
-        icon: UsersRound,
-      },
-    ]
+    // Helper to check active state
+    const isActive = (url: string) => {
+      if (url === '/dashboard') return currentPath === '/dashboard';
+      return currentPath.startsWith(url);
+    };
 
-    const adminItems = [
-      {
-        title: "Subjects",
-        url: "/subjects",
-        icon: BookOpen,
-      },
-      {
-        title: "Users",
-        url: "/users",
-        icon: Users,
-      },
-      {
-        title: "Settings",
-        url: "/settings",
-        icon: Settings,
-      },
-    ]
+    const dashboardItem = {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: LayoutDashboard,
+      isActive: isActive("/dashboard"),
+    };
 
+    const usersItem = {
+      title: "Users",
+      url: "/users",
+      icon: Users,
+      isActive: isActive("/users"),
+    };
+
+    const subjectsItem = {
+      title: "Subjects",
+      url: "/subjects",
+      icon: BookOpen,
+      isActive: isActive("/subjects"),
+    };
+
+    const studentGroupsItem = {
+      title: "Student Groups",
+      url: "/student-groups",
+      icon: UsersRound,
+      isActive: isActive("/student-groups"),
+    };
+
+    const questionsItem = {
+      title: "Questions",
+      url: "/questions",
+      icon: FileQuestion,
+      isActive: isActive("/questions"),
+    };
+
+    const testsItem = {
+      title: "Tests",
+      url: "/tests",
+      icon: ClipboardList,
+      isActive: isActive("/tests"),
+    };
+
+    const reportsItem = {
+      title: "Reports",
+      url: "/reports",
+      icon: BarChart3,
+      isActive: isActive("/reports"),
+    };
+
+    const settingsItem = {
+      title: "Settings",
+      url: "/settings",
+      icon: Settings,
+      isActive: isActive("/settings"),
+    };
+
+    // Order: Dashboard, Users, Subjects, Student Groups, Questions, Tests, Reports, Settings
     if (user?.role === 'admin') {
-      return [...commonItems, ...teacherAdminItems, ...adminItems]
+      return [
+        dashboardItem,
+        usersItem,
+        subjectsItem,
+        studentGroupsItem,
+        questionsItem,
+        testsItem,
+        reportsItem,
+        settingsItem
+      ];
     } else if (user?.role === 'teacher') {
-      return [...commonItems, ...teacherAdminItems]
+      return [
+        dashboardItem,
+        studentGroupsItem,
+        questionsItem,
+        testsItem,
+        reportsItem
+      ];
     } else {
-      return commonItems
+      // Student or other
+      return [
+        dashboardItem,
+        testsItem,
+        reportsItem
+      ];
     }
   }
 
@@ -121,7 +158,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link to="/dashboard">
-                <div className="bg-linear-to-br from-blue-600 to-blue-800 text-white flex aspect-square size-8 items-center justify-center rounded-lg shadow-sm">
+                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg shadow-sm">
                   <GraduationCap className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">

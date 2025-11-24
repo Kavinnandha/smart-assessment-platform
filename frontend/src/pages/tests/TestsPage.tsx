@@ -4,6 +4,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Plus, Calendar, Clock, Users, FileText, Trash2, Eye, EyeOff, Edit, ClipboardList, PlayCircle, CheckCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Test {
   _id: string;
@@ -37,6 +54,8 @@ const TestsPage = () => {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [testToDelete, setTestToDelete] = useState<string | null>(null);
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -71,18 +90,24 @@ const TestsPage = () => {
     return submissions.find(sub => sub.test === testId || (sub.test as any)?._id === testId);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this test?')) {
-      return;
-    }
+  const handleDeleteClick = (id: string) => {
+    setTestToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!testToDelete) return;
 
     try {
-      await api.delete(`/tests/${id}`);
-      alert('Test deleted successfully');
+      await api.delete(`/tests/${testToDelete}`);
+      // alert('Test deleted successfully'); // Removed alert for better UX
       fetchTests();
     } catch (error) {
       console.error('Failed to delete test:', error);
       alert('Failed to delete test');
+    } finally {
+      setDeleteDialogOpen(false);
+      setTestToDelete(null);
     }
   };
 
@@ -241,11 +266,11 @@ const TestsPage = () => {
                   // Student view - show Start Test button or View Results
                   (() => {
                     const submission = getSubmissionForTest(test._id);
-                    
+
                     if (submission) {
                       // Student has already submitted - check if results are available
                       const canViewResults = test.showResultsImmediately || test.resultsPublished;
-                      
+
                       if (canViewResults) {
                         return (
                           <div className="flex flex-col gap-2">
@@ -257,8 +282,8 @@ const TestsPage = () => {
                             </Link>
                             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                               <span className="px-2 py-1 bg-muted/50 rounded text-center">
-                                {submission.status === 'evaluated' 
-                                  ? `Evaluated - ${submission.totalMarksObtained || 0}/${test.totalMarks}` 
+                                {submission.status === 'evaluated'
+                                  ? `Evaluated - ${submission.totalMarksObtained || 0}/${test.totalMarks}`
                                   : 'Pending Evaluation'}
                               </span>
                             </div>
@@ -281,7 +306,7 @@ const TestsPage = () => {
                         );
                       }
                     }
-                    
+
                     // Student hasn't submitted yet - show Start Test button
                     return (
                       <div className="flex gap-2">
@@ -296,107 +321,111 @@ const TestsPage = () => {
                   })()
                 ) : (
                   // Teacher/Admin view - show management buttons
-                  <>
-                    <div className="flex gap-2">
-                      <Link to={`/tests/${test._id}`} className="flex-1">
-                        <Button size="sm" variant="outline" className="w-full text-xs sm:text-sm">
-                          View Details
-                        </Button>
-                      </Link>
-                      <Link to={`/tests/edit/${test._id}`}>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                          title="Edit test"
-                        >
-                          <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                    <div className="flex gap-2">
-                      <Link to={`/tests/submissions?testId=${test._id}`} className="flex-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full text-purple-600 hover:text-purple-700 hover:bg-purple-50 text-xs sm:text-sm"
-                          title="View submissions"
-                        >
-                          <ClipboardList className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          Submissions
-                        </Button>
-                      </Link>
-                    </div>
-                    <div className="flex gap-2">
-                      {test.isPublished ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleUnpublish(test._id)}
-                          className="flex-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
-                          title="Unpublish test"
-                        >
-                          <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          Unpublish
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handlePublish(test._id)}
-                          className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50 text-xs sm:text-sm"
-                          title="Publish test"
-                        >
-                          <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          Publish
-                        </Button>
+                  <div className="flex items-center gap-1 mt-4 pt-4 border-t">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link to={`/tests/${test._id}`}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>View Details</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link to={`/tests/edit/${test._id}`}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit Test</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link to={`/tests/submissions?testId=${test._id}`}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-50">
+                              <ClipboardList className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>View Submissions</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => test.isPublished ? handleUnpublish(test._id) : handlePublish(test._id)}
+                            className={`h-8 w-8 ${test.isPublished ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-green-600 hover:text-green-700 hover:bg-green-50"}`}
+                          >
+                            {test.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{test.isPublished ? "Unpublish Test" : "Publish Test"}</TooltipContent>
+                      </Tooltip>
+
+                      {!test.showResultsImmediately && test.isPublished && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => test.resultsPublished ? handleUnpublishResults(test._id) : handlePublishResults(test._id)}
+                              className={`h-8 w-8 ${test.resultsPublished ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50" : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"}`}
+                            >
+                              {test.resultsPublished ? <EyeOff className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{test.resultsPublished ? "Unpublish Results" : "Publish Results"}</TooltipContent>
+                        </Tooltip>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(test._id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete test"
-                      >
-                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                      </Button>
-                    </div>
-                    {!test.showResultsImmediately && test.isPublished && (
-                      <div className="flex gap-2">
-                        {test.resultsPublished ? (
+
+                      <div className="flex-1"></div>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
                           <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleUnpublishResults(test._id)}
-                            className="flex-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50 text-xs sm:text-sm"
-                            title="Unpublish results - students will no longer see their scores"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => handleDeleteClick(test._id)}
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
-                            <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            <span className="hidden sm:inline">Unpublish Results</span>
-                            <span className="sm:hidden">Results Off</span>
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handlePublishResults(test._id)}
-                            className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs sm:text-sm"
-                            title="Publish results - students will be able to see their scores"
-                          >
-                            <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                            <span className="hidden sm:inline">Publish Results</span>
-                            <span className="sm:hidden">Results On</span>
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Test</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 )}
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Test</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this test? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

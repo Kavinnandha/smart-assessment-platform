@@ -57,21 +57,21 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-md p-6 sm:p-8 bg-white rounded-lg shadow-lg">
-        <div className="mb-6 text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create Account</h1>
-          <p className="mt-2 text-sm sm:text-base text-gray-600">Register for Smart Assessment Platform</p>
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className="w-full max-w-md p-6 sm:p-8 bg-card rounded-xl shadow-lg border border-border">
+        <div className="mb-8 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Create Account</h1>
+          <p className="mt-2 text-sm sm:text-base text-muted-foreground">Join the Smart Assessment Platform</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+          <div className="mb-6 p-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-md text-sm font-medium">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2">
             <Label htmlFor="name">Full Name</Label>
             <Input
               id="name"
@@ -81,11 +81,11 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your full name"
-              className="text-base"
+              className="text-base h-11"
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
@@ -95,18 +95,18 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your email"
-              className="text-base"
+              className="text-base h-11"
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
             <select
               id="role"
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="student">Student</option>
               <option value="teacher">Teacher</option>
@@ -114,7 +114,7 @@ const RegisterPage = () => {
             </select>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
               id="password"
@@ -124,11 +124,11 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Enter your password"
-              className="text-base"
+              className="text-base h-11"
             />
           </div>
 
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm Password</Label>
             <Input
               id="confirmPassword"
@@ -138,19 +138,19 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               placeholder="Confirm your password"
-              className="text-base"
+              className="text-base h-11"
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
             {loading ? 'Creating account...' : 'Register'}
           </Button>
         </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
+        <div className="mt-8 text-center">
+          <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium">
+            <Link to="/login" className="text-primary hover:text-primary/80 font-semibold transition-colors">
               Sign in here
             </Link>
           </p>

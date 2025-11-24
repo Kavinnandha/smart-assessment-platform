@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,16 +89,16 @@ const TakeTestPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  
+
   // Get API base URL for file uploads
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
-  
+
   // Student test-taking state
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [testStarted, setTestStarted] = useState(false);
-  
+
   const isStudent = user?.role === 'student';
   const isTakingTest = location.pathname.includes('/tests/take/');
 
@@ -115,7 +116,7 @@ const TakeTestPage = () => {
       const existingSubmission = submissions.find(
         (sub: any) => sub.test === id || sub.test?._id === id
       );
-      
+
       if (existingSubmission) {
         setAlreadySubmitted(true);
       }
@@ -146,7 +147,7 @@ const TakeTestPage = () => {
       const response = await api.get(`/tests/${id}`);
       const fetchedTest = response.data.test;
       setTest(fetchedTest);
-      
+
       // Initialize answers for students
       if (isStudent) {
         const initialAnswers = fetchedTest.questions.map((q: Question) => ({
@@ -180,7 +181,7 @@ const TakeTestPage = () => {
 
   const handleSubmit = async () => {
     if (!test) return;
-    
+
     const unanswered = answers.filter(a => !a.answer.trim()).length;
     if (unanswered > 0) {
       if (!window.confirm(`You have ${unanswered} unanswered question(s). Do you want to submit anyway?`)) {
@@ -195,15 +196,15 @@ const TakeTestPage = () => {
         answers: answers,
         timeTaken: (test.duration * 60) - timeRemaining
       });
-      
+
       const { autoGraded, totalMarksObtained } = response.data;
-      
+
       if (autoGraded) {
         alert(`Test submitted and auto-graded successfully!\n\nYour Score: ${totalMarksObtained} / ${test.totalMarks} marks`);
       } else {
         alert('Test submitted successfully! Results will be available after manual evaluation.');
       }
-      
+
       navigate('/tests');
     } catch (error: any) {
       console.error('Failed to submit test:', error);
@@ -293,17 +294,17 @@ const TakeTestPage = () => {
       // Helper function to decode HTML entities and strip HTML tags
       const decodeHTML = (html: string): string => {
         if (!html || typeof html !== 'string') return '';
-        
+
         // Create a temporary div element for decoding
         const tempDiv = document.createElement('div');
-        
+
         // First pass: decode HTML entities
         tempDiv.innerHTML = html;
         let decoded = tempDiv.textContent || tempDiv.innerText || '';
-        
+
         // Clean up the div
         tempDiv.remove();
-        
+
         // Additional cleanup for common encoding issues
         decoded = decoded
           // Remove attachment placeholders first
@@ -329,7 +330,7 @@ const TakeTestPage = () => {
           // Remove empty lines created by placeholder removal
           .replace(/\n\s*\n/g, '\n')
           .trim();
-        
+
         return decoded;
       };
 
@@ -377,7 +378,7 @@ const TakeTestPage = () => {
             // Calculate dimensions to fit within page
             let imgWidth = img.width * 0.264583; // Convert px to mm
             let imgHeight = img.height * 0.264583;
-            
+
             // Scale down if too wide
             if (imgWidth > maxWidth) {
               const ratio = maxWidth / imgWidth;
@@ -394,7 +395,7 @@ const TakeTestPage = () => {
             }
 
             checkPageBreak(imgHeight + 10);
-            
+
             doc.addImage(dataUrl, 'JPEG', margin + 20, yPosition, imgWidth, imgHeight);
             yPosition += imgHeight + 5;
             return true;
@@ -438,10 +439,10 @@ const TakeTestPage = () => {
       const addWrappedText = (text: string, x: number, fontSize: number, maxWidth: number, fontStyle: string = 'normal') => {
         // Pre-process to remove attachment placeholders before any other processing
         const preprocessedText = text.replace(/\{\{attachment:\d+\}\}/g, '');
-        
+
         // Decode HTML entities and strip tags before rendering
         const decodedText = decodeHTML(preprocessedText);
-        
+
         // Additional safety check to remove any problematic characters
         const cleanText = decodedText
           .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
@@ -467,11 +468,11 @@ const TakeTestPage = () => {
             }
             return char;
           });
-        
+
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', fontStyle);
         const lines = doc.splitTextToSize(cleanText, maxWidth);
-        
+
         for (let i = 0; i < lines.length; i++) {
           checkPageBreak(7);
           doc.text(lines[i], x, yPosition);
@@ -485,37 +486,37 @@ const TakeTestPage = () => {
         // Header
         doc.setFillColor(37, 99, 235); // Blue
         doc.rect(0, 0, pageWidth, 30, 'F');
-        
+
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(20);
         doc.setFont('helvetica', 'bold');
         doc.text(test.title, pageWidth / 2, 15, { align: 'center' });
-        
+
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.text(test.subject?.name || 'N/A', pageWidth / 2, 23, { align: 'center' });
-        
+
         yPosition = 40;
 
         // Test Info
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        
+
         const infoItems = [
           `Duration: ${test.duration} minutes`,
           `Questions: ${test.questions.length}`,
           `Total Marks: ${test.totalMarks}`,
           `Status: ${test.isPublished ? 'Published' : 'Draft'}`
         ];
-        
+
         const infoWidth = contentWidth / 4;
         infoItems.forEach((item, index) => {
           doc.text(item, margin + (index * infoWidth), yPosition);
         });
-        
+
         yPosition += 10;
-        
+
         // Line separator
         doc.setDrawColor(200, 200, 200);
         doc.line(margin, yPosition, pageWidth - margin, yPosition);
@@ -524,12 +525,12 @@ const TakeTestPage = () => {
         // For answers-only, simpler header
         doc.setFillColor(16, 185, 129); // Green
         doc.rect(0, 0, pageWidth, 25, 'F');
-        
+
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
         doc.text(`${test.title} - Answer Key`, pageWidth / 2, 15, { align: 'center' });
-        
+
         yPosition = 35;
       }
 
@@ -547,7 +548,7 @@ const TakeTestPage = () => {
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(20);
-          
+
           // Question number circle
           doc.setFillColor(220, 252, 231); // Light green
           doc.circle(margin + 5, yPosition, 5, 'F');
@@ -555,9 +556,9 @@ const TakeTestPage = () => {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 5, yPosition + 1.5, { align: 'center' });
-          
+
           yPosition += 8;
-          
+
           // Answer box
           checkPageBreak(15);
           const answerBoxHeight = Math.max(15, Math.ceil((item.question.correctAnswer?.length || 20) / 50) * 5);
@@ -566,22 +567,22 @@ const TakeTestPage = () => {
           doc.setDrawColor(16, 185, 129); // Green border
           doc.setLineWidth(0.5);
           doc.roundedRect(margin + 10, yPosition, contentWidth - 10, answerBoxHeight, 3, 3, 'S');
-          
+
           yPosition += 5;
-          
+
           doc.setTextColor(6, 78, 59);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
           const answer = item.question.correctAnswer || 'Not provided';
           addWrappedText(answer, margin + 12, 10, contentWidth - 14, 'normal');
-          
+
           yPosition += 5;
-          
+
           // Add answer attachments if they exist
           if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
             await addAttachmentsToPDF(item.question.correctAnswerAttachments);
           }
-          
+
           yPosition += 5;
         }
       } else if (exportType === 'questions-only') {
@@ -596,12 +597,12 @@ const TakeTestPage = () => {
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(25);
-          
+
           // Question card background
           doc.setFillColor(249, 250, 251);
           doc.setDrawColor(229, 231, 235);
           doc.setLineWidth(0.5);
-          
+
           // Question number circle
           doc.setFillColor(219, 234, 254);
           doc.circle(margin + 8, yPosition + 3, 5, 'F');
@@ -609,7 +610,7 @@ const TakeTestPage = () => {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
-          
+
           // Marks badge
           doc.setFillColor(219, 234, 254);
           doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
@@ -617,19 +618,19 @@ const TakeTestPage = () => {
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
-          
+
           // Question text
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(11);
           doc.setFont('helvetica', 'normal');
           yPosition += 5;
           addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
-          
+
           // Add question attachments if they exist
           if (item.question.attachments && item.question.attachments.length > 0) {
             await addAttachmentsToPDF(item.question.attachments);
           }
-          
+
           yPosition += 8;
         }
       } else if (exportType === 'questions-with-answers') {
@@ -642,51 +643,51 @@ const TakeTestPage = () => {
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(30);
-          
+
           // Question section (background will auto-expand with content)
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(11);
-          
+
           doc.setFillColor(219, 234, 254);
           doc.circle(margin + 8, yPosition + 3, 5, 'F');
           doc.setTextColor(30, 64, 175);
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
-          
+
           doc.setFillColor(219, 234, 254);
           doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
           doc.setTextColor(30, 64, 175);
           doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
-          
+
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(11);
           yPosition += 5;
           addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
-          
+
           // Add question attachments if they exist
           if (item.question.attachments && item.question.attachments.length > 0) {
             await addAttachmentsToPDF(item.question.attachments);
           }
-          
+
           yPosition += 3;
-          
+
           // Answer box (inline) - adding some padding for the answer
           checkPageBreak(15);
-          
+
           yPosition += 5;
-          
+
           doc.setTextColor(6, 78, 59);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
           const answer = item.question.correctAnswer || 'Not provided';
           addWrappedText(answer, margin + 22, 10, contentWidth - 29, 'normal');
-          
+
           // Add answer attachments if they exist
           if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
             await addAttachmentsToPDF(item.question.correctAnswerAttachments);
           }
-          
+
           yPosition += 8;
         }
       } else if (exportType === 'questions-with-space') {
@@ -699,7 +700,7 @@ const TakeTestPage = () => {
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(40);
-          
+
           // Question section (no background box for simplicity)
           doc.setFillColor(219, 234, 254);
           doc.circle(margin + 8, yPosition + 3, 5, 'F');
@@ -707,35 +708,35 @@ const TakeTestPage = () => {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
-          
+
           doc.setFillColor(219, 234, 254);
           doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
           doc.setTextColor(30, 64, 175);
           doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
-          
+
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(11);
           yPosition += 5;
           addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
-          
+
           // Add question attachments if they exist
           if (item.question.attachments && item.question.attachments.length > 0) {
             await addAttachmentsToPDF(item.question.attachments);
           }
-          
+
           yPosition += 3;
-          
+
           // Answer space (box for writing) - use dynamic height based on answerLines
           const answerLines = item.question.answerLines || 3;
           const lineHeight = 6;
           const answerBoxHeight = answerLines * lineHeight + 4; // +4 for padding
-          
+
           checkPageBreak(answerBoxHeight + 5);
           doc.setDrawColor(209, 213, 219);
           doc.setLineWidth(0.3);
           // Dashed border effect using multiple short lines
           doc.rect(margin + 20, yPosition, contentWidth - 25, answerBoxHeight, 'S');
-          
+
           // Draw horizontal lines for each answer line
           doc.setDrawColor(229, 231, 235);
           doc.setLineWidth(0.1);
@@ -743,11 +744,11 @@ const TakeTestPage = () => {
             const lineY = yPosition + (line * lineHeight) + 2;
             doc.line(margin + 22, lineY, margin + contentWidth - 7, lineY);
           }
-          
+
           doc.setFontSize(8);
           doc.setTextColor(156, 163, 175);
           doc.text(`Space for answer (${answerLines} lines)`, margin + (contentWidth / 2), yPosition + (answerBoxHeight / 2) + 1, { align: 'center' });
-          
+
           yPosition += answerBoxHeight + 5;
         }
       } else if (exportType === 'questions-answers-end') {
@@ -760,7 +761,7 @@ const TakeTestPage = () => {
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(25);
-          
+
           // No background box for simplicity
           doc.setFillColor(219, 234, 254);
           doc.circle(margin + 8, yPosition + 3, 5, 'F');
@@ -768,42 +769,42 @@ const TakeTestPage = () => {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
-          
+
           doc.setFillColor(219, 234, 254);
           doc.roundedRect(pageWidth - margin - 30, yPosition - 2, 28, 8, 2, 2, 'F');
           doc.setTextColor(30, 64, 175);
           doc.text(`${item.marks} marks`, pageWidth - margin - 16, yPosition + 3.5, { align: 'center' });
-          
+
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(11);
           yPosition += 5;
           addWrappedText(item.question.questionText, margin + 20, 11, contentWidth - 50, 'normal');
-          
+
           // Add question attachments if they exist
           if (item.question.attachments && item.question.attachments.length > 0) {
             await addAttachmentsToPDF(item.question.attachments);
           }
-          
+
           yPosition += 8;
         }
 
         // New page for answers
         doc.addPage();
         yPosition = margin;
-        
+
         doc.setFillColor(16, 185, 129);
         doc.rect(0, 0, pageWidth, 25, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Answer Key', pageWidth / 2, 15, { align: 'center' });
-        
+
         yPosition = 35;
 
         for (let index = 0; index < sortedQuestions.length; index++) {
           const item = sortedQuestions[index];
           checkPageBreak(20);
-          
+
           // No background box for simplicity  
           doc.setFillColor(220, 252, 231);
           doc.circle(margin + 8, yPosition + 3, 5, 'F');
@@ -811,35 +812,35 @@ const TakeTestPage = () => {
           doc.setFontSize(12);
           doc.setFont('helvetica', 'bold');
           doc.text(`${index + 1}`, margin + 8, yPosition + 4.5, { align: 'center' });
-          
+
           yPosition += 10;
-          
+
           checkPageBreak(15);
-          
+
           doc.setTextColor(6, 78, 59);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
           const answer = item.question.correctAnswer || 'Not provided';
           addWrappedText(answer, margin + 17, 10, contentWidth - 19, 'normal');
-          
+
           // Add answer attachments if they exist
           if (item.question.correctAnswerAttachments && item.question.correctAnswerAttachments.length > 0) {
             await addAttachmentsToPDF(item.question.correctAnswerAttachments);
           }
-          
+
           yPosition += 8;
         }
       }
 
       // Footer
-      const currentDate = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
+      const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
-      
+
       const totalPages = doc.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
@@ -857,12 +858,12 @@ const TakeTestPage = () => {
         'questions-with-space': 'Questions_with_Answer_Space',
         'answers-only': 'Answer_Key'
       };
-      
+
       const fileName = `${test.title.replace(/[^a-z0-9]/gi, '_')}_${exportTypeNames[exportType]}.pdf`;
-      
+
       // Save the PDF
       doc.save(fileName);
-      
+
     } catch (error) {
       console.error('Failed to generate PDF:', error);
       alert('Failed to generate PDF. Please try again.');
@@ -906,10 +907,10 @@ const TakeTestPage = () => {
     // Split text by placeholders and render inline
     const parts: (string | React.ReactNode)[] = [];
     let lastIndex = 0;
-    
+
     // First, collect all placeholders and their positions
     const placeholderMatches = Array.from(questionText.matchAll(/\{\{attachment:(\d+)\}\}/g));
-    
+
     for (const match of placeholderMatches) {
       const matchIndex = match.index!;
       const attachmentIndex = parseInt(match[1]);
@@ -938,7 +939,7 @@ const TakeTestPage = () => {
 
     return (
       <div className="text-lg font-medium mb-2">
-        {parts.map((part, idx) => 
+        {parts.map((part, idx) =>
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
       </div>
@@ -954,7 +955,7 @@ const TakeTestPage = () => {
     return (
       <div key={idx} className="inline-block w-full">
         {attachment.fileType.startsWith('image/') ? (
-          <img 
+          <img
             src={`${FILE_BASE_URL}${attachment.fileUrl}`}
             alt="Question attachment"
             className="max-w-2xl rounded-lg border shadow-sm"
@@ -962,7 +963,7 @@ const TakeTestPage = () => {
         ) : (
           <div className="flex items-center gap-2 p-3 bg-muted/30 border rounded-lg max-w-md">
             <File className="w-5 h-5 text-muted-foreground shrink-0" />
-            <a 
+            <a
               href={`${FILE_BASE_URL}${attachment.fileUrl}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -1015,7 +1016,7 @@ const TakeTestPage = () => {
               <p className="text-lg text-muted-foreground mb-6">
                 You have already submitted this test. Only one attempt is allowed.
               </p>
-              
+
               <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg mb-6">
                 <h2 className="text-xl font-semibold mb-2">{test?.title}</h2>
                 <p className="text-muted-foreground">{test?.subject?.name || 'N/A'}</p>
@@ -1042,7 +1043,7 @@ const TakeTestPage = () => {
           <div className="bg-card p-8 rounded-lg shadow">
             <h1 className="text-3xl font-bold mb-4">{test.title}</h1>
             <p className="text-lg text-muted-foreground mb-6">{test.subject?.name || 'N/A'}</p>
-            
+
             {test.description && (
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
                 <p className="text-blue-900 dark:text-blue-300">{test.description}</p>
@@ -1167,9 +1168,9 @@ const TakeTestPage = () => {
                         <div className="flex-1">
                           {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}
                           {item.question.questionImage && (
-                            <img 
-                              src={item.question.questionImage} 
-                              alt="Question" 
+                            <img
+                              src={item.question.questionImage}
+                              alt="Question"
                               className="max-w-md rounded-lg border mb-4"
                             />
                           )}
@@ -1285,13 +1286,14 @@ const TakeTestPage = () => {
 
   // Teacher view - Test details
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
+    <div className="container mx-auto py-6 max-w-7xl">
+      <div className="flex items-center justify-between mb-6">
         <Button
           variant="outline"
           onClick={() => navigate('/tests')}
+          className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4" />
           Back to Tests
         </Button>
 
@@ -1330,7 +1332,7 @@ const TakeTestPage = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          
+
           <Button
             variant="outline"
             onClick={() => navigate(`/tests/edit/${test._id}`)}
@@ -1339,7 +1341,7 @@ const TakeTestPage = () => {
             <Edit className="h-4 w-4 mr-2" />
             Edit Test
           </Button>
-          
+
           {test.isPublished ? (
             <Button
               variant="outline"
@@ -1361,183 +1363,193 @@ const TakeTestPage = () => {
         </div>
       </div>
 
-      {/* Test Header */}
-      <div className="bg-card p-6 rounded-lg shadow mb-6">
-        <div className="flex items-start justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">
-              {test.title}
-            </h1>
-            <p className="text-lg text-muted-foreground">{test.subject?.name || 'N/A'}</p>
-          </div>
-          {test.isPublished ? (
-            <span className="px-3 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-full text-sm font-medium">
-              Published
-            </span>
-          ) : (
-            <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded-full text-sm font-medium">
-              Draft
-            </span>
-          )}
-        </div>
-
-        {test.description && (
-          <p className="mb-4 p-4 bg-muted/30 rounded-lg">
-            {test.description}
-          </p>
-        )}
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Duration</p>
-              <p className="font-semibold">{test.duration} minutes</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Questions</p>
-              <p className="font-semibold">{test.questions.length}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Total Marks</p>
-              <p className="font-semibold">{test.totalMarks}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            <div>
-              <p className="text-xs text-muted-foreground">Assigned To</p>
-              <p className="font-semibold">{test.assignedTo.length} students</p>
-            </div>
-          </div>
-        </div>
-
-        {(test.scheduledDate || test.deadline) && (
-          <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
-            {test.scheduledDate && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* LEFT COLUMN - Test Info (Span 4) */}
+        <div className="lg:col-span-4 space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs text-muted-foreground">Scheduled Date</p>
-                  <p className="font-medium text-sm">{formatDate(test.scheduledDate)}</p>
+                  <CardTitle className="text-xl mb-1">{test.title}</CardTitle>
+                  <p className="text-sm text-muted-foreground">{test.subject?.name || 'N/A'}</p>
                 </div>
+                {test.isPublished ? (
+                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 rounded-full text-xs font-medium">
+                    Published
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-medium">
+                    Draft
+                  </span>
+                )}
               </div>
-            )}
-            {test.deadline && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-red-600 dark:text-red-400" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Deadline</p>
-                  <p className="font-medium text-sm">{formatDate(test.deadline)}</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {test.description && (
+                <div className="p-3 bg-muted/30 rounded-md text-sm">
+                  {test.description}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        <div className="mt-4 pt-4 border-t">
-          <p className="text-sm text-muted-foreground">
-            Created by <span className="font-medium">{test.createdBy.name}</span> on{' '}
-            {formatDate(test.createdAt)}
-          </p>
-        </div>
-      </div>
-
-      {/* Questions List */}
-      <div className="bg-card p-6 rounded-lg shadow mb-6">
-        <h2 className="text-xl font-semibold mb-4">Questions ({test.questions.length})</h2>
-        <div className="space-y-4">
-          {test.questions
-            .sort((a, b) => a.order - b.order)
-            .map((item, index) => (
-              <div key={item._id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold">
-                      {index + 1}
-                    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="font-semibold text-sm">{test.duration} min</p>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="text-sm text-muted-foreground">
-                          Q{index + 1}
-                        </p>
-                        <div className="mt-1">
-                          {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}
-                        </div>
-                        {/* Display question image if exists */}
-                        {item.question.questionImage && (
-                          <img 
-                            src={item.question.questionImage} 
-                            alt="Question" 
-                            className="max-w-md rounded-lg border mt-2"
-                          />
-                        )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Questions</p>
+                    <p className="font-semibold text-sm">{test.questions.length}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total Marks</p>
+                    <p className="font-semibold text-sm">{test.totalMarks}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Assigned</p>
+                    <p className="font-semibold text-sm">{test.assignedTo.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {(test.scheduledDate || test.deadline) && (
+                <div className="pt-4 border-t space-y-3">
+                  {test.scheduledDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Scheduled Date</p>
+                        <p className="font-medium text-sm">{formatDate(test.scheduledDate)}</p>
                       </div>
-                      <span className="ml-4 px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded text-sm font-medium shrink-0">
-                        {item.marks} marks
-                      </span>
                     </div>
-                    <div className="flex gap-4 text-sm text-muted-foreground mt-2">
-                      <span>Chapter: {item.question.chapter}</span>
-                      {item.question.topic && (
-                        <span>Topic: {item.question.topic}</span>
-                      )}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${
-                          item.question.difficultyLevel === 'easy'
-                            ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-                            : item.question.difficultyLevel === 'medium'
-                            ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                            : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                        }`}
-                      >
-                        {item.question.difficultyLevel}
-                      </span>
+                  )}
+                  {test.deadline && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-red-600 dark:text-red-400" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Deadline</p>
+                        <p className="font-medium text-sm">{formatDate(test.deadline)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="pt-4 border-t text-xs text-muted-foreground">
+                Created by <span className="font-medium">{test.createdBy.name}</span> on{' '}
+                {formatDate(test.createdAt)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Assigned Students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {test.assignedTo.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-2">
+                  No students assigned
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                  {test.assignedTo.map((student) => (
+                    <div
+                      key={student._id}
+                      className="flex items-center gap-3 p-2 border rounded-md hover:bg-muted/30 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold text-xs shrink-0">
+                        {student.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {student.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">{student.email}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT COLUMN - Questions List (Span 8) */}
+        <div className="lg:col-span-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Questions ({test.questions.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {test.questions
+                .sort((a, b) => a.order - b.order)
+                .map((item, index) => (
+                  <div key={item._id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-start gap-4">
+                      <div className="shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold text-sm">
+                          {index + 1}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2 gap-4">
+                          <div className="flex-1">
+                            <div className="mt-1 text-sm">
+                              {renderQuestionWithAttachments(item.question.questionText, item.question.attachments)}
+                            </div>
+                            {item.question.questionImage && (
+                              <img
+                                src={item.question.questionImage}
+                                alt="Question"
+                                className="max-w-md rounded-lg border mt-2"
+                              />
+                            )}
+                          </div>
+                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded text-xs font-medium shrink-0 whitespace-nowrap">
+                            {item.marks} marks
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground mt-3 pt-3 border-t border-dashed">
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">Chapter:</span> {item.question.chapter}
+                          </span>
+                          {item.question.topic && (
+                            <span className="flex items-center gap-1">
+                              <span className="font-medium">Topic:</span> {item.question.topic}
+                            </span>
+                          )}
+                          <span
+                            className={`px-2 py-0.5 rounded-full ${item.question.difficultyLevel === 'easy'
+                                ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
+                                : item.question.difficultyLevel === 'medium'
+                                  ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                  : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                              }`}
+                          >
+                            {item.question.difficultyLevel}
+                          </span>
+                          <span className="ml-auto font-medium capitalize text-blue-600 dark:text-blue-400">
+                            {item.question.questionType?.replace('-', ' ') || 'Short Answer'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                ))}
+            </CardContent>
+          </Card>
         </div>
-      </div>
-
-      {/* Assigned Students */}
-      <div className="bg-card p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">
-          Assigned Students ({test.assignedTo.length})
-        </h2>
-        {test.assignedTo.length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">
-            No students assigned to this test
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {test.assignedTo.map((student) => (
-              <div
-                key={student._id}
-                className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-semibold">
-                  {student.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {student.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground truncate">{student.email}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

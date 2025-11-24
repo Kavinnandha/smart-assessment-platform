@@ -4,39 +4,63 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Plus, Trash2, Wand2, ChevronUp, ChevronDown, Eye, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Search, Plus, Trash2, Wand2, Eye, X, Calendar as CalendarIcon, GripVertical, Clock, Filter, Layers, Pencil, Check, ChevronsUpDown } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import type { DateRange } from "react-day-picker";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Interfaces
 interface Question {
   _id: string;
-  questionNumber: string;
   questionText: string;
-  chapter: string;
-  topic: string;
+  questionType: string;
   marks: number;
   difficultyLevel: 'easy' | 'medium' | 'hard';
-  questionType?: 'multiple-choice' | 'true-false' | 'short-answer' | 'long-answer';
-  questionImage?: string;
+  chapter: string;
+  topic?: string;
   options?: string[];
   correctAnswer?: string;
-  answerLines?: number;
-  tags?: string[];
-  attachments?: Array<{
-    fileName: string;
-    fileUrl: string;
-    fileType: string;
-    fileSize: number;
-  }>;
-  correctAnswerAttachments?: Array<{
-    fileName: string;
-    fileUrl: string;
-    fileType: string;
-    fileSize: number;
-  }>;
-  subject: {
-    _id: string;
-    name: string;
-  };
+  attachments?: any[];
 }
 
 interface Student {
@@ -48,8 +72,7 @@ interface Student {
 interface Group {
   _id: string;
   name: string;
-  description: string;
-  students: Student[];
+  students: string[];
 }
 
 interface Chapter {
@@ -77,12 +100,178 @@ interface TestSection {
   order: number;
 }
 
+// MultiSelect Checkbox Component
+function MultiSelectCheckbox({
+  options,
+  selected,
+  onChange,
+  placeholder = "Select items...",
+  className,
+}: {
+  options: { label: string; value: string }[];
+  selected: string[];
+  onChange: (selected: string[]) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const handleSelect = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((item) => item !== value));
+    } else {
+      onChange([...selected, value]);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between text-xs h-8 px-3", className)}
+        >
+          <span className="truncate">
+            {selected.length === 0
+              ? placeholder
+              : `${selected.length} selected`}
+          </span>
+          <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}...`} className="h-8 text-xs" />
+          <CommandList>
+            <CommandEmpty>No item found.</CommandEmpty>
+            <CommandGroup className="max-h-64 overflow-y-auto">
+              {options.map((option) => (
+                <CommandItem
+                  key={option.value}
+                  value={option.label}
+                  onSelect={() => {
+                    handleSelect(option.value);
+                  }}
+                  className="text-xs flex items-center gap-2 cursor-pointer"
+                >
+                  <div
+                    className={cn(
+                      "flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                      selected.includes(option.value)
+                        ? "bg-primary text-primary-foreground"
+                        : "opacity-50 [&_svg]:invisible"
+                    )}
+                  >
+                    <Check className={cn("h-3 w-3")} />
+                  </div>
+                  {option.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Sortable Item Component
+function SortableQuestionItem({
+  id,
+  question,
+  index,
+  onRemove,
+  onUpdateMarks,
+  onMoveToSection,
+  sections,
+  sectionId
+}: {
+  id: string;
+  question: Question;
+  index: number;
+  onRemove: (id: string) => void;
+  onUpdateMarks: (id: string, marks: number) => void;
+  onMoveToSection: (id: string, sectionId: string) => void;
+  sections: TestSection[];
+  sectionId: string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-3 border rounded-lg bg-card text-sm group relative hover:shadow-sm transition-all">
+      <div className="flex justify-between gap-3 mb-2">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <button {...attributes} {...listeners} className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5">Q{index + 1}</Badge>
+              <Badge variant={question.difficultyLevel === 'easy' ? 'secondary' : question.difficultyLevel === 'medium' ? 'default' : 'destructive'} className="text-[10px] h-5 px-1.5 capitalize">
+                {question.difficultyLevel}
+              </Badge>
+              <span className="text-xs text-muted-foreground truncate">{question.chapter}</span>
+            </div>
+            <p className="font-medium truncate text-sm">{question.questionText}</p>
+          </div>
+        </div>
+        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0" onClick={() => onRemove(question._id)}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex items-center justify-between gap-2 pl-7 mt-2">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs text-muted-foreground">Marks:</Label>
+          <Input
+            type="number"
+            value={question.marks}
+            onChange={(e) => onUpdateMarks(question._id, Number(e.target.value))}
+            className="h-7 w-16 text-xs"
+          />
+        </div>
+        {sections.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Label className="text-xs text-muted-foreground">Section:</Label>
+            <Select
+              value={sectionId}
+              onValueChange={(val) => onMoveToSection(question._id, val)}
+            >
+              <SelectTrigger className="h-7 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sections.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const CreateTestPage = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = !!id;
-  
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const { setLabel } = useBreadcrumb();
+
+  const [currentTab, setCurrentTab] = useState<string>('details');
   const [mode, setMode] = useState<'manual' | 'auto'>('manual');
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -95,6 +284,11 @@ const CreateTestPage = () => {
   const [selectedSectionForQuestion, setSelectedSectionForQuestion] = useState<string>('default');
   const [isAddingSectionMode, setIsAddingSectionMode] = useState(false);
   const [newSectionName, setNewSectionName] = useState('');
+
+  // Section Renaming State
+  const [renamingSectionId, setRenamingSectionId] = useState<string | null>(null);
+  const [renamingSectionName, setRenamingSectionName] = useState('');
+
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [assignmentType, setAssignmentType] = useState<'individual' | 'group'>('group');
@@ -103,15 +297,34 @@ const CreateTestPage = () => {
   const [initialLoading, setInitialLoading] = useState(false);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  
+
+  // Alert Dialog States
+  const [alertOpen, setAlertOpen] = useState(false);
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    description: string;
+    action: () => void;
+    actionLabel?: string;
+    cancelLabel?: string;
+  }>({ title: '', description: '', action: () => { } });
+
   const [formData, setFormData] = useState({
     title: '',
     subject: '',
     description: '',
     duration: '60',
-    scheduledDate: '',
-    deadline: '',
+    scheduledTime: '09:00',
+    deadlineTime: '12:00',
     showResultsImmediately: false
+  });
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
+  const [commonFilters, setCommonFilters] = useState({
+    chapters: [] as string[],
+    topics: [] as string[],
+    difficulty: [] as string[],
+    marks: [] as string[],
   });
 
   const [autoGenSettings, setAutoGenSettings] = useState({
@@ -119,19 +332,15 @@ const CreateTestPage = () => {
     easyPercentage: '40',
     mediumPercentage: '40',
     hardPercentage: '20',
-    chapters: [] as string[],
-    topics: [] as string[],
     questionTypes: [] as string[],
-    specificMarks: [] as number[]
   });
 
-  const [filters, setFilters] = useState({
-    subject: '',
-    chapter: '',
-    difficulty: '',
-    minMarks: '',
-    maxMarks: ''
-  });
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     fetchSubjects();
@@ -144,75 +353,17 @@ const CreateTestPage = () => {
 
   // Clear topics when chapters change
   useEffect(() => {
-    setAutoGenSettings(prev => ({
+    setCommonFilters(prev => ({
       ...prev,
       topics: []
     }));
-  }, [autoGenSettings.chapters]);
+  }, [commonFilters.chapters]);
 
   useEffect(() => {
-    if (mode === 'manual') {
-      // Debounce the API call for marks filters to avoid too many requests while typing
-      const timeoutId = setTimeout(() => {
-        if (filters.subject || filters.chapter || filters.difficulty || filters.minMarks || filters.maxMarks || searchQuery) {
-          fetchQuestions();
-        }
-      }, 300); // 300ms delay
-
-      return () => clearTimeout(timeoutId);
+    if (formData.subject) {
+      fetchQuestions();
     }
-  }, [filters, mode, searchQuery]);
-
-  const fetchTest = async () => {
-    try {
-      setInitialLoading(true);
-      const response = await api.get(`/tests/${id}`);
-      const test = response.data.test;
-      
-      // Populate form data
-      setFormData({
-        title: test.title || '',
-        subject: test.subject?._id || '',
-        description: test.description || '',
-        duration: test.duration?.toString() || '60',
-        scheduledDate: test.scheduledDate ? new Date(test.scheduledDate).toISOString().slice(0, 16) : '',
-        deadline: test.deadline ? new Date(test.deadline).toISOString().slice(0, 16) : '',
-        showResultsImmediately: test.showResultsImmediately || false
-      });
-
-      // Set filters for question loading
-      if (test.subject?._id) {
-        setFilters({ ...filters, subject: test.subject._id });
-      }
-
-      // Set selected questions
-      if (test.questions && test.questions.length > 0) {
-        const selectedQs = test.questions.map((q: any) => ({
-          question: q.question._id || q.question,
-          marks: q.marks,
-          order: q.order,
-          section: q.section || 'default'
-        }));
-        setSelectedQuestions(selectedQs);
-      }
-
-      // Set sections
-      if (test.sections && test.sections.length > 0) {
-        setSections(test.sections);
-      }
-
-      // Set selected students
-      if (test.assignedTo && test.assignedTo.length > 0) {
-        const studentIds = test.assignedTo.map((s: any) => s._id || s);
-        setSelectedStudents(studentIds);
-      }
-    } catch (error) {
-      console.error('Failed to fetch test:', error);
-      alert('Failed to load test details');
-    } finally {
-      setInitialLoading(false);
-    }
-  };
+  }, [formData.subject, commonFilters]);
 
   const fetchSubjects = async () => {
     try {
@@ -223,27 +374,10 @@ const CreateTestPage = () => {
     }
   };
 
-  const fetchQuestions = async () => {
-    try {
-      const params: any = {};
-      if (filters.subject) params.subject = filters.subject;
-      if (filters.chapter) params.chapter = filters.chapter;
-      if (filters.difficulty) params.difficultyLevel = filters.difficulty;
-      if (filters.minMarks) params.minMarks = filters.minMarks;
-      if (filters.maxMarks) params.maxMarks = filters.maxMarks;
-      if (searchQuery) params.search = searchQuery;
-
-      const response = await api.get('/questions', { params });
-      setQuestions(response.data.questions);
-    } catch (error) {
-      console.error('Failed to fetch questions:', error);
-    }
-  };
-
   const fetchStudents = async () => {
     try {
-      const response = await api.get('/users?role=student');
-      setStudents(response.data.users || []);
+      const response = await api.get('/auth/students');
+      setStudents(response.data);
     } catch (error) {
       console.error('Failed to fetch students:', error);
     }
@@ -252,240 +386,240 @@ const CreateTestPage = () => {
   const fetchGroups = async () => {
     try {
       const response = await api.get('/groups');
-      setGroups(response.data || []);
+      setGroups(response.data);
     } catch (error) {
       console.error('Failed to fetch groups:', error);
     }
   };
 
-  const handleAddQuestion = (question: Question) => {
-    if (selectedQuestions.find(q => q.question === question._id)) {
-      alert('Question already added');
-      return;
-    }
+  const fetchQuestions = async () => {
+    try {
+      const params: any = { subject: formData.subject };
+      if (commonFilters.chapters.length) params.chapter = commonFilters.chapters.join(',');
+      if (commonFilters.topics.length) params.topic = commonFilters.topics.join(',');
+      if (commonFilters.difficulty.length) params.difficultyLevel = commonFilters.difficulty.join(',');
+      if (commonFilters.marks.length) params.marks = commonFilters.marks.join(',');
 
-    const newQuestion: SelectedQuestion = {
+      const response = await api.get('/questions', { params });
+      setQuestions(response.data.questions);
+    } catch (error) {
+      console.error('Failed to fetch questions:', error);
+    }
+  };
+
+  const fetchTest = async () => {
+    if (!id) return;
+    try {
+      setInitialLoading(true);
+      const response = await api.get(`/tests/${id}`);
+      const test = response.data;
+
+      setLabel(test._id, test.title);
+
+      setFormData({
+        title: test.title,
+        subject: test.subject._id,
+        description: test.description || '',
+        duration: test.duration.toString(),
+        scheduledTime: test.scheduledFor ? new Date(test.scheduledFor).toTimeString().slice(0, 5) : '09:00',
+        deadlineTime: test.deadline ? new Date(test.deadline).toTimeString().slice(0, 5) : '12:00',
+        showResultsImmediately: test.showResultsImmediately || false
+      });
+
+      if (test.scheduledFor && test.deadline) {
+        setDateRange({
+          from: new Date(test.scheduledFor),
+          to: new Date(test.deadline)
+        });
+      }
+
+      if (test.sections && test.sections.length > 0) {
+        setSections(test.sections.map((s: any) => ({
+          id: s.name, // Using name as ID for simplicity if ID not present, but ideally use ID
+          name: s.name,
+          description: s.description,
+          order: s.order || 1
+        })));
+      }
+
+      // Map questions
+      const mappedQuestions = test.questions.map((q: any, idx: number) => ({
+        question: q.question._id || q.question, // Handle populated or unpopulated
+        marks: q.marks,
+        order: q.order || idx,
+        section: q.section || 'default'
+      }));
+      setSelectedQuestions(mappedQuestions);
+
+      // Handle assignments
+      if (test.assignedToGroups && test.assignedToGroups.length > 0) {
+        setAssignmentType('group');
+        setSelectedGroup(test.assignedToGroups[0]);
+      } else if (test.assignedToStudents && test.assignedToStudents.length > 0) {
+        setAssignmentType('individual');
+        setSelectedStudents(test.assignedToStudents);
+      }
+
+    } catch (error) {
+      console.error('Failed to fetch test:', error);
+      showAlert('Error', 'Failed to load test details');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  const handleAddQuestion = (question: Question) => {
+    if (selectedQuestions.some(sq => sq.question === question._id)) return;
+
+    setSelectedQuestions([...selectedQuestions, {
       question: question._id,
       marks: question.marks,
-      order: selectedQuestions.length + 1,
+      order: selectedQuestions.length,
       section: selectedSectionForQuestion
-    };
-
-    setSelectedQuestions([...selectedQuestions, newQuestion]);
+    }]);
   };
 
   const handleRemoveQuestion = (questionId: string) => {
-    const updated = selectedQuestions
-      .filter(q => q.question !== questionId)
-      .map((q, index) => ({ ...q, order: index + 1 }));
-    setSelectedQuestions(updated);
+    setSelectedQuestions(selectedQuestions.filter(sq => sq.question !== questionId));
   };
 
   const handleUpdateMarks = (questionId: string, marks: number) => {
-    const updated = selectedQuestions.map(q =>
-      q.question === questionId ? { ...q, marks } : q
-    );
-    setSelectedQuestions(updated);
+    setSelectedQuestions(selectedQuestions.map(sq =>
+      sq.question === questionId ? { ...sq, marks } : sq
+    ));
   };
 
-  const moveQuestionUp = (questionId: string) => {
-    const currentIndex = selectedQuestions.findIndex(q => q.question === questionId);
-    if (currentIndex <= 0) return; // Already at top or not found
-
-    const newQuestions = [...selectedQuestions];
-    const temp = newQuestions[currentIndex];
-    newQuestions[currentIndex] = newQuestions[currentIndex - 1];
-    newQuestions[currentIndex - 1] = temp;
-
-    // Update order numbers
-    const reorderedQuestions = newQuestions.map((q, index) => ({
-      ...q,
-      order: index + 1
-    }));
-
-    setSelectedQuestions(reorderedQuestions);
+  const handleMoveQuestionToSection = (questionId: string, sectionId: string) => {
+    setSelectedQuestions(selectedQuestions.map(sq =>
+      sq.question === questionId ? { ...sq, section: sectionId } : sq
+    ));
   };
 
-  const moveQuestionDown = (questionId: string) => {
-    const currentIndex = selectedQuestions.findIndex(q => q.question === questionId);
-    if (currentIndex >= selectedQuestions.length - 1 || currentIndex < 0) return; // Already at bottom or not found
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    const newQuestions = [...selectedQuestions];
-    const temp = newQuestions[currentIndex];
-    newQuestions[currentIndex] = newQuestions[currentIndex + 1];
-    newQuestions[currentIndex + 1] = temp;
+    if (active.id !== over?.id) {
+      const oldIndex = selectedQuestions.findIndex((q) => q.question === active.id);
+      const newIndex = selectedQuestions.findIndex((q) => q.question === over?.id);
 
-    // Update order numbers
-    const reorderedQuestions = newQuestions.map((q, index) => ({
-      ...q,
-      order: index + 1
-    }));
-
-    setSelectedQuestions(reorderedQuestions);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        setSelectedQuestions((items) => {
+          return arrayMove(items, oldIndex, newIndex).map((item, index) => ({ ...item, order: index }));
+        });
+      }
+    }
   };
 
-  const handlePreviewQuestion = (question: Question) => {
-    setPreviewQuestion(question);
-    setIsPreviewOpen(true);
-  };
-
-  // Section management functions
   const handleAddSection = () => {
-    if (!newSectionName.trim()) {
-      alert('Please enter a section name');
+    if (!newSectionName.trim()) return;
+    const id = newSectionName.toLowerCase().replace(/\s+/g, '-');
+    if (sections.some(s => s.id === id)) {
+      showAlert('Error', 'Section name already exists');
       return;
     }
 
-    if (sections.find(s => s.name.toLowerCase() === newSectionName.toLowerCase())) {
-      alert('Section with this name already exists');
-      return;
-    }
-
-    const newSection: TestSection = {
-      id: `section_${Date.now()}`,
+    setSections([...sections, {
+      id,
       name: newSectionName,
       order: sections.length + 1
-    };
-
-    setSections([...sections, newSection]);
+    }]);
     setNewSectionName('');
     setIsAddingSectionMode(false);
-    setSelectedSectionForQuestion(newSection.id);
+    setSelectedSectionForQuestion(id);
   };
 
   const handleRemoveSection = (sectionId: string) => {
-    if (sectionId === 'default') {
-      alert('Cannot remove the default section');
-      return;
-    }
+    if (sectionId === 'default') return;
 
-    // Check if section has questions
-    const questionsInSection = selectedQuestions.filter(q => q.section === sectionId);
-    if (questionsInSection.length > 0) {
-      const confirmMove = window.confirm(
-        `This section has ${questionsInSection.length} question(s). Move them to default section?`
-      );
-      
-      if (confirmMove) {
-        // Move questions to default section
-        const updatedQuestions = selectedQuestions.map(q => 
-          q.section === sectionId ? { ...q, section: 'default' } : q
-        );
-        setSelectedQuestions(updatedQuestions);
-      } else {
-        return;
-      }
-    }
+    // Move questions to default section
+    setSelectedQuestions(selectedQuestions.map(sq =>
+      sq.section === sectionId ? { ...sq, section: 'default' } : sq
+    ));
 
     setSections(sections.filter(s => s.id !== sectionId));
-    
-    // If current selected section is being removed, switch to default
     if (selectedSectionForQuestion === sectionId) {
       setSelectedSectionForQuestion('default');
     }
   };
 
-  const handleMoveQuestionToSection = (questionId: string, newSectionId: string) => {
-    const updatedQuestions = selectedQuestions.map(q =>
-      q.question === questionId ? { ...q, section: newSectionId } : q
-    );
-    setSelectedQuestions(updatedQuestions);
+  const handleStartRenamingSection = (section: TestSection) => {
+    setRenamingSectionId(section.id);
+    setRenamingSectionName(section.name);
   };
 
-  // Get API base URL for file uploads
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
-
-  // Helper function to render question text with inline attachments for preview
-  const renderQuestionTextWithAttachments = (questionText: string, attachments?: Array<{
-    fileName: string;
-    fileUrl: string;
-    fileType: string;
-    fileSize: number;
-  }>) => {
-    if (!attachments || attachments.length === 0) {
-      return questionText;
+  const handleSaveRenamedSection = () => {
+    if (!renamingSectionId || !renamingSectionName.trim()) {
+      setRenamingSectionId(null);
+      return;
     }
 
-    // Check if question text contains attachment placeholders
-    const placeholderRegex = /\{\{attachment:(\d+)\}\}/g;
-    const hasPlaceholders = placeholderRegex.test(questionText);
+    setSections(sections.map(s =>
+      s.id === renamingSectionId ? { ...s, name: renamingSectionName } : s
+    ));
+    setRenamingSectionId(null);
+    setRenamingSectionName('');
+  };
 
-    if (!hasPlaceholders) {
-      return questionText;
-    }
+  const handleAutoGenerate = () => {
+    // Logic to auto-select questions based on settings
+    // This is a simplified client-side implementation
+    // In a real app, this might be an API call
+    const { totalMarks, easyPercentage, mediumPercentage, hardPercentage } = autoGenSettings;
+    const targetMarks = parseInt(totalMarks);
 
-    // Split text by placeholders and render inline
-    const parts: (string | React.ReactNode)[] = [];
-    let lastIndex = 0;
-    
-    const placeholderMatches = Array.from(questionText.matchAll(/\{\{attachment:(\d+)\}\}/g));
-    
-    for (const match of placeholderMatches) {
-      const matchIndex = match.index!;
-      const attachmentIndex = parseInt(match[1]);
+    // Filter available questions based on common filters first
+    let availableQuestions = [...questions];
+    // (Assuming questions are already filtered by the API call based on commonFilters)
 
-      // Add text before placeholder
-      if (matchIndex > lastIndex) {
-        parts.push(questionText.substring(lastIndex, matchIndex));
+    // Sort by difficulty
+    const easyQuestions = availableQuestions.filter(q => q.difficultyLevel === 'easy');
+    const mediumQuestions = availableQuestions.filter(q => q.difficultyLevel === 'medium');
+    const hardQuestions = availableQuestions.filter(q => q.difficultyLevel === 'hard');
+
+    let selected: SelectedQuestion[] = [];
+    let currentMarks = 0;
+
+    // Helper to add questions
+    const addQuestions = (pool: Question[], percentage: number) => {
+      const target = targetMarks * (percentage / 100);
+      let marks = 0;
+      for (const q of pool) {
+        if (marks + q.marks <= target && !selected.some(sq => sq.question === q._id)) {
+          selected.push({
+            question: q._id,
+            marks: q.marks,
+            order: selected.length,
+            section: selectedSectionForQuestion
+          });
+          marks += q.marks;
+        }
       }
+      return marks;
+    };
 
-      // Add attachment (without placeholder text)
-      if (attachmentIndex < attachments.length) {
-        parts.push(
-          <div key={`attachment-${attachmentIndex}`} className="my-4">
-            {renderAttachmentPreview(attachments[attachmentIndex], attachmentIndex)}
-          </div>
-        );
+    currentMarks += addQuestions(easyQuestions, parseInt(easyPercentage));
+    currentMarks += addQuestions(mediumQuestions, parseInt(mediumPercentage));
+    currentMarks += addQuestions(hardQuestions, parseInt(hardPercentage));
+
+    // Fill remaining marks with any available questions if needed
+    if (currentMarks < targetMarks) {
+      const remaining = availableQuestions.filter(q => !selected.some(sq => sq.question === q._id));
+      for (const q of remaining) {
+        if (currentMarks + q.marks <= targetMarks) {
+          selected.push({
+            question: q._id,
+            marks: q.marks,
+            order: selected.length,
+            section: selectedSectionForQuestion
+          });
+          currentMarks += q.marks;
+        }
       }
-
-      lastIndex = matchIndex + match[0].length;
     }
 
-    // Add remaining text
-    if (lastIndex < questionText.length) {
-      parts.push(questionText.substring(lastIndex));
-    }
-
-    return (
-      <div>
-        {parts.map((part, idx) => 
-          typeof part === 'string' ? <span key={idx}>{part}</span> : part
-        )}
-      </div>
-    );
-  };
-
-  const renderAttachmentPreview = (attachment: {
-    fileName: string;
-    fileUrl: string;
-    fileType: string;
-    fileSize: number;
-  }, idx: number) => {
-    return (
-      <div key={idx} className="inline-block w-full">
-        {attachment.fileType.startsWith('image/') ? (
-          <img 
-            src={`${FILE_BASE_URL}${attachment.fileUrl}`}
-            alt="Question attachment"
-            className="max-w-2xl rounded-lg border shadow-sm"
-          />
-        ) : (
-          <div className="flex items-center gap-2 p-3 bg-muted/30 border rounded-lg max-w-md">
-            <span className="text-sm font-medium">{attachment.fileName}</span>
-            <span className="text-xs text-muted-foreground">({(attachment.fileSize / 1024).toFixed(1)} KB)</span>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const toggleStudent = (studentId: string) => {
-    if (selectedStudents.includes(studentId)) {
-      setSelectedStudents(selectedStudents.filter(id => id !== studentId));
-    } else {
-      setSelectedStudents([...selectedStudents, studentId]);
-    }
+    setSelectedQuestions(selected);
+    setMode('manual'); // Switch back to view results
+    showAlert('Success', `Auto-generated ${selected.length} questions totaling ${currentMarks} marks.`);
   };
 
   const selectAllStudents = () => {
@@ -496,150 +630,80 @@ const CreateTestPage = () => {
     setSelectedStudents([]);
   };
 
-  const getAssignedStudents = (): string[] => {
-    // Only return individual students when assignment type is 'individual'
-    if (assignmentType === 'individual') {
-      return selectedStudents;
-    }
-    return [];
-  };
-
-  const getAssignedGroups = (): string[] => {
-    // Only return groups when assignment type is 'group'
-    if (assignmentType === 'group' && selectedGroup) {
-      return [selectedGroup];
-    }
-    return [];
-  };
-
-  // Helper function to get available topics for selected chapters
-  const getAvailableTopics = (): string[] => {
-    if (!formData.subject) return [];
-    
-    const selectedSubject = subjects.find(s => s._id === formData.subject);
-    if (!selectedSubject || !selectedSubject.chapters) return [];
-
-    const topicsSet = new Set<string>();
-    
-    // If no chapters selected, get topics from all chapters
-    if (autoGenSettings.chapters.length === 0) {
-      selectedSubject.chapters.forEach(chapter => {
-        if (chapter.topics && Array.isArray(chapter.topics)) {
-          chapter.topics.forEach(topic => topicsSet.add(topic));
-        }
-      });
+  const toggleStudent = (studentId: string) => {
+    if (selectedStudents.includes(studentId)) {
+      setSelectedStudents(selectedStudents.filter(id => id !== studentId));
     } else {
-      // Get topics only from selected chapters
-      selectedSubject.chapters.forEach(chapter => {
-        if (autoGenSettings.chapters.includes(chapter.name) && chapter.topics && Array.isArray(chapter.topics)) {
-          chapter.topics.forEach(topic => topicsSet.add(topic));
-        }
-      });
-    }
-    
-    return Array.from(topicsSet).sort();
-  };
-
-  // Helper function to get available question types
-  const getAvailableQuestionTypes = (): string[] => {
-    return ['multiple-choice', 'true-false', 'short-answer', 'long-answer'];
-  };
-
-  // Helper function to get common mark values
-  const getCommonMarkValues = (): number[] => {
-    return [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25];
-  };
-
-  const handleAutoGenerate = async () => {
-    try {
-      // Validate difficulty percentages
-      const totalPercentage = Number(autoGenSettings.easyPercentage) + 
-                             Number(autoGenSettings.mediumPercentage) + 
-                             Number(autoGenSettings.hardPercentage);
-      
-      if (totalPercentage !== 100) {
-        alert(`Difficulty percentages must add up to 100%. Current total: ${totalPercentage}%`);
-        return;
-      }
-
-      if (Number(autoGenSettings.totalMarks) <= 0) {
-        alert('Total marks must be greater than 0');
-        return;
-      }
-
-      setLoading(true);
-      const response = await api.post('/tests/auto-generate', {
-        subject: formData.subject,
-        title: formData.title,
-        duration: Number(formData.duration),
-        totalMarks: Number(autoGenSettings.totalMarks),
-        easyPercentage: Number(autoGenSettings.easyPercentage),
-        mediumPercentage: Number(autoGenSettings.mediumPercentage),
-        hardPercentage: Number(autoGenSettings.hardPercentage),
-        chapters: autoGenSettings.chapters.length > 0 ? autoGenSettings.chapters : undefined,
-        topics: autoGenSettings.topics.length > 0 ? autoGenSettings.topics : undefined,
-        questionTypes: autoGenSettings.questionTypes.length > 0 ? autoGenSettings.questionTypes : undefined,
-        specificMarks: autoGenSettings.specificMarks.length > 0 ? autoGenSettings.specificMarks : undefined
-      });
-
-      const generatedQuestions = response.data.questions;
-      
-      // Extract populated questions from the response and update the questions state
-      const populatedQuestions = generatedQuestions.map((q: any) => q.question);
-      setQuestions((prevQuestions) => {
-        // Merge with existing questions, avoiding duplicates
-        const questionMap = new Map();
-        [...prevQuestions, ...populatedQuestions].forEach(q => {
-          if (q && q._id) {
-            questionMap.set(q._id, q);
-          }
-        });
-        return Array.from(questionMap.values());
-      });
-      
-      // Set selected questions
-      const newSelectedQuestions = generatedQuestions.map((q: any) => ({
-        question: q.question._id,
-        marks: q.marks,
-        order: q.order,
-        section: selectedSectionForQuestion
-      }));
-      
-      console.log('Auto-generated questions:', newSelectedQuestions);
-      console.log('Current selected section:', selectedSectionForQuestion);
-      console.log('Available sections:', sections);
-      
-      setSelectedQuestions(newSelectedQuestions);
-      
-      alert(`Questions auto-generated successfully! ${generatedQuestions.length} questions selected.`);
-      setMode('manual'); // Switch to manual mode to review
-    } catch (error: any) {
-      console.error('Failed to auto-generate test:', error);
-      const errorMessage = error.response?.data?.message || 'Failed to auto-generate test';
-      alert(errorMessage);
-    } finally {
-      setLoading(false);
+      setSelectedStudents([...selectedStudents, studentId]);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePreviewQuestion = (question: Question) => {
+    setPreviewQuestion(question);
+    setIsPreviewOpen(true);
+  };
 
-    if (selectedQuestions.length === 0) {
-      alert('Please add at least one question');
+  const renderQuestionTextWithAttachments = (text: string, attachments: any[]) => {
+    // Simplified rendering for preview
+    return (
+      <div>
+        <p className="whitespace-pre-wrap">{text}</p>
+        {attachments && attachments.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {attachments.map((att, idx) => (
+              <div key={idx} className="text-xs border p-2 rounded">
+                {att.fileName}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const showAlert = (title: string, description: string, action?: () => void, actionLabel = "OK", cancelLabel?: string) => {
+    setAlertConfig({
+      title,
+      description,
+      action: action || (() => setAlertOpen(false)),
+      actionLabel,
+      cancelLabel
+    });
+    setAlertOpen(true);
+  };
+
+  const getAssignedStudents = () => {
+    if (assignmentType === 'individual') return selectedStudents;
+    const group = groups.find(g => g._id === selectedGroup);
+    return group ? group.students : [];
+  };
+
+  const getAssignedGroups = () => {
+    if (assignmentType === 'group') return [selectedGroup];
+    return [];
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.title || !formData.subject || !formData.duration) {
+      showAlert('Error', 'Please fill in all required fields');
       return;
     }
 
-    await createTest(true); // Publish by default
+    if (selectedQuestions.length === 0) {
+      showAlert('Error', 'Please add at least one question');
+      return;
+    }
+
+    await createTest(true);
   };
 
   const handleSaveAsDraft = async () => {
     if (selectedQuestions.length === 0) {
-      alert('Please add at least one question');
+      showAlert('Error', 'Please add at least one question');
       return;
     }
 
-    await createTest(false); // Save as draft
+    await createTest(false);
   };
 
   const createTest = async (publish: boolean) => {
@@ -649,35 +713,64 @@ const CreateTestPage = () => {
       const assignedStudents = getAssignedStudents();
       const assignedGroups = getAssignedGroups();
 
+      let scheduledDateISO = undefined;
+      if (dateRange?.from && formData.scheduledTime) {
+        const [hours, minutes] = formData.scheduledTime.split(':').map(Number);
+        const d = new Date(dateRange.from);
+        d.setHours(hours, minutes);
+        scheduledDateISO = d.toISOString();
+      }
+
+      let deadlineDateISO = undefined;
+      if (dateRange?.to && formData.deadlineTime) {
+        const [hours, minutes] = formData.deadlineTime.split(':').map(Number);
+        const d = new Date(dateRange.to);
+        d.setHours(hours, minutes);
+        deadlineDateISO = d.toISOString();
+      } else if (dateRange?.from && formData.deadlineTime) {
+        // Single day test
+        const [hours, minutes] = formData.deadlineTime.split(':').map(Number);
+        const d = new Date(dateRange.from);
+        d.setHours(hours, minutes);
+        deadlineDateISO = d.toISOString();
+      }
+
       const payload = {
         title: formData.title,
         subject: formData.subject,
         description: formData.description,
-        duration: Number(formData.duration),
+        duration: parseInt(formData.duration),
         totalMarks,
-        questions: selectedQuestions,
-        sections: sections,
-        assignedTo: assignedStudents,
-        assignedGroups: assignedGroups,
-        scheduledDate: formData.scheduledDate || undefined,
-        deadline: formData.deadline || undefined,
-        isPublished: publish,
-        showResultsImmediately: formData.showResultsImmediately,
-        resultsPublished: false
+        passingMarks: Math.ceil(totalMarks * 0.4), // Default 40%
+        scheduledFor: scheduledDateISO,
+        deadline: deadlineDateISO,
+        questions: selectedQuestions.map(sq => ({
+          question: sq.question,
+          marks: sq.marks,
+          order: sq.order,
+          section: sq.section
+        })),
+        sections: sections.map(s => ({
+          name: s.name,
+          description: s.description,
+          order: s.order
+        })),
+        assignedToStudents: assignmentType === 'individual' ? assignedStudents : [],
+        assignedToGroups: assignmentType === 'group' ? assignedGroups : [],
+        status: publish ? 'published' : 'draft',
+        showResultsImmediately: formData.showResultsImmediately
       };
 
       if (isEditMode) {
         await api.put(`/tests/${id}`, payload);
-        alert(publish ? 'Test updated and published successfully!' : 'Test updated successfully!');
+        showAlert('Success', 'Test updated successfully', () => navigate('/tests'));
       } else {
         await api.post('/tests', payload);
-        alert(publish ? 'Test created and published successfully!' : 'Test saved as draft successfully!');
+        showAlert('Success', 'Test created successfully', () => navigate('/tests'));
       }
-      
-      navigate('/tests');
     } catch (error) {
-      console.error('Failed to create/update test:', error);
-      alert(`Failed to ${isEditMode ? 'update' : 'create'} test`);
+      console.error('Failed to save test:', error);
+      showAlert('Error', 'Failed to save test');
     } finally {
       setLoading(false);
     }
@@ -701,1377 +794,745 @@ const CreateTestPage = () => {
     );
   }
 
-  return (
-    <div className="w-full">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
-          {isEditMode ? 'Edit Test' : 'Create Test'}
-        </h1>
+  const currentSubject = subjects.find(s => s._id === formData.subject);
+  const chapterOptions = currentSubject?.chapters.map(c => ({ label: c.name, value: c.name })) || [];
 
-        {/* Tab Navigation */}
-        <div className="mb-4 sm:mb-6">
-          <div className="border-b">
-            <nav className="-mb-px flex gap-3 sm:gap-6 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setCurrentStep(1)}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  currentStep === 1
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }`}
-              >
-                Test Information
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(2)}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  currentStep === 2
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }`}
-              >
-                Student Assignment
-              </button>
-              <button
-                type="button"
-                onClick={() => setCurrentStep(3)}
-                className={`py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${
-                  currentStep === 3
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                }`}
-              >
-                Questions
-              </button>
-            </nav>
+  // Derive topic options based on selected chapters
+  const topicOptions = currentSubject?.chapters
+    .filter(c => commonFilters.chapters.includes(c.name))
+    .flatMap(c => c.topics.map(t => ({ label: t, value: t }))) || [];
+
+  return (
+    <div className="w-full pb-10">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            {isEditMode ? 'Edit Test' : 'Create Test'}
+          </h1>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate('/tests')}>Cancel</Button>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="w-full space-y-4 sm:space-y-6">
-        {/* Step 1: Test Information */}
-        {currentStep === 1 && (
-          <>
-            {/* Basic Information */}
-            <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
-              <h2 className="text-lg sm:text-xl font-semibold mb-4">Test Information</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <Label htmlFor="title">Test Title *</Label>
-                  <Input
-                    id="title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    required
-                    placeholder="e.g., Midterm Exam - Mathematics"
-                    className="text-base"
-                  />
-                </div>
+        <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+            <TabsTrigger value="details">Test Details</TabsTrigger>
+            <TabsTrigger value="questions" disabled={!formData.title || !formData.subject}>Questions</TabsTrigger>
+          </TabsList>
 
-                <div className="sm:col-span-1">
-                  <Label htmlFor="subject">Subject *</Label>
-                  <select
-                    id="subject"
-                    value={formData.subject}
-                    onChange={(e) => {
-                      setFormData({ ...formData, subject: e.target.value });
-                      setFilters({ ...filters, subject: e.target.value, chapter: '' });
-                    }}
-                    required
-                    className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-base"
-                  >
-                    <option value="">Select Subject</option>
-                    {subjects.map((subject) => (
-                      <option key={subject._id} value={subject._id}>
-                        {subject.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-1">
-                  <Label htmlFor="duration">Duration (minutes) *</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                    required
-                    min="1"
-                    className="text-base"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="scheduledDate">Scheduled Date</Label>
-                  <Input
-                    id="scheduledDate"
-                    type="datetime-local"
-                    value={formData.scheduledDate}
-                    onChange={(e) => setFormData({ ...formData, scheduledDate: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="deadline">Deadline</Label>
-                  <Input
-                    id="deadline"
-                    type="datetime-local"
-                    value={formData.deadline}
-                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <Label htmlFor="description">Description (Optional)</Label>
-                  <textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="flex w-full rounded-md border px-3 py-2"
-                    rows={3}
-                    placeholder="Instructions for students..."
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <div className="flex items-center space-x-3 p-4 border rounded-lg bg-blue-50 border-blue-200">
-                    <input
-                      id="showResultsImmediately"
-                      type="checkbox"
-                      checked={formData.showResultsImmediately}
-                      onChange={(e) => setFormData({ ...formData, showResultsImmediately: e.target.checked })}
-                      className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <div className="flex-1">
-                      <Label htmlFor="showResultsImmediately" className="font-medium text-blue-900">
-                        Show Results Immediately After Submission
-                      </Label>
-                      <p className="text-sm text-blue-700 mt-1">
-                        When enabled, students can see their results immediately after submitting the test. 
-                        When disabled, results will only be visible after you manually publish them.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/tests')}
-              >
-                Cancel
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* Step 2: Student Assignment */}
-        {currentStep === 2 && (
-          <div className="w-full space-y-4 sm:space-y-6">
-            {/* Student Assignment */}
-            <div className="bg-card p-4 sm:p-6 rounded-lg shadow">
-              <h2 className="text-lg sm:text-xl font-semibold mb-4">Assign to Students</h2>
-              
-              <div className="grid grid-cols-1 gap-4">
-                {/* Assignment Type Selector */}
-                <div>
-                  <Label className="mb-2 block">Assignment Type</Label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="assignmentType"
-                        value="group"
-                        checked={assignmentType === 'group'}
-                        onChange={(e) => setAssignmentType(e.target.value as 'group')}
-                        className="h-4 w-4"
-                      />
-                      <span>Assign to Group</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="assignmentType"
-                        value="individual"
-                        checked={assignmentType === 'individual'}
-                        onChange={(e) => setAssignmentType(e.target.value as 'individual')}
-                        className="h-4 w-4"
-                      />
-                      <span>Assign to Individual Students</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Group Selection */}
-                {assignmentType === 'group' && (
-                  <div>
-                    <Label htmlFor="group">Select Group *</Label>
-                    <select
-                      id="group"
-                      value={selectedGroup}
-                      onChange={(e) => setSelectedGroup(e.target.value)}
-                      className="flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm mb-3"
-                    >
-                      <option value="">Select a Group</option>
-                      {groups.map((group) => (
-                        <option key={group._id} value={group._id}>
-                          {group.name} ({group.students.length} students)
-                        </option>
-                      ))}
-                    </select>
-
-                    {selectedGroup && (
-                      <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-sm font-semibold mb-2">Selected Group Students:</p>
-                        <div className="max-h-48 overflow-y-auto">
-                          {groups.find(g => g._id === selectedGroup)?.students.map((student) => (
-                            <div key={student._id} className="text-sm py-1 flex items-center gap-2">
-                              <span className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full"></span>
-                              <span>{student.name}</span>
-                              <span className="text-muted-foreground">({student.email})</span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-sm font-medium mt-2 text-blue-700 dark:text-blue-400">
-                          Total: {groups.find(g => g._id === selectedGroup)?.students.length} students
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Individual Student Selection */}
-                {assignmentType === 'individual' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={selectAllStudents}
-                        >
-                          Select All
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={deselectAllStudents}
-                        >
-                          Deselect All
-                        </Button>
-                      </div>
-                    </div>
-
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Selected: <span className="font-semibold">{selectedStudents.length}</span> / {students.length} students
-                    </p>
-
-                    <div className="max-h-64 overflow-y-auto border rounded-lg">
-                      {students.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No students found in the system
-                        </div>
-                      ) : (
-                        <div className="divide-y">
-                          {students.map((student) => (
-                            <label
-                              key={student._id}
-                              className="flex items-center gap-3 p-3 hover:bg-muted/30 cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedStudents.includes(student._id)}
-                                onChange={() => toggleStudent(student._id)}
-                                className="h-4 w-4 rounded"
-                              />
-                              <div className="flex-1">
-                                <p className="font-medium">{student.name}</p>
-                                <p className="text-sm text-muted-foreground">{student.email}</p>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/tests')}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Question Selection */}
-        {currentStep === 3 && (
-          <>
-            {/* Question Selection Mode */}
-            <div className="bg-card p-6 rounded-lg shadow">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Questions</h2>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={mode === 'manual' ? 'default' : 'outline'}
-                    onClick={() => setMode('manual')}
-                  >
-                    Manual Selection
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={mode === 'auto' ? 'default' : 'outline'}
-                    onClick={() => setMode('auto')}
-                  >
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Auto Generate
-                  </Button>
-                </div>
-              </div>
-
-              {/* Auto Generate Mode */}
-              {mode === 'auto' && (
-                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-sm">
-                    Automatically select questions based on difficulty distribution
-                  </p>
-
-                  {/* Chapter Selection */}
-                  <div>
-                    <Label className="mb-2 block">Select Chapters (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Leave empty to include all chapters, or select specific chapters
-                    </p>
-                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-background p-3">
-                      {formData.subject ? (
-                        (() => {
-                          const selectedSubject = subjects.find(s => s._id === formData.subject);
-                          return selectedSubject && selectedSubject.chapters && selectedSubject.chapters.length > 0 ? (
-                            <div className="space-y-2">
-                              {selectedSubject.chapters.map((chapter, index) => (
-                                <label
-                                  key={index}
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={autoGenSettings.chapters.includes(chapter.name)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setAutoGenSettings({
-                                          ...autoGenSettings,
-                                          chapters: [...autoGenSettings.chapters, chapter.name]
-                                        });
-                                      } else {
-                                        setAutoGenSettings({
-                                          ...autoGenSettings,
-                                          chapters: autoGenSettings.chapters.filter(c => c !== chapter.name)
-                                        });
-                                      }
-                                    }}
-                                    className="h-4 w-4 rounded border-gray-300"
-                                  />
-                                  <span className="text-sm">{chapter.name}</span>
-                                </label>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-sm text-muted-foreground text-center py-2">
-                              No chapters available for this subject
-                            </p>
-                          );
-                        })()
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-2">
-                          Please select a subject first
-                        </p>
-                      )}
-                    </div>
-                    {autoGenSettings.chapters.length > 0 && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                          {autoGenSettings.chapters.length} chapter(s) selected
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAutoGenSettings({ ...autoGenSettings, chapters: [] })}
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Topic Selection */}
-                  <div>
-                    <Label className="mb-2 block">Select Topics (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Select specific topics from the chosen chapters
-                    </p>
-                    <div className="max-h-48 overflow-y-auto border rounded-lg bg-background p-3">
-                      {(() => {
-                        const availableTopics = getAvailableTopics();
-                        return availableTopics.length > 0 ? (
-                          <div className="space-y-2">
-                            {availableTopics.map((topic, index) => (
-                              <label
-                                key={index}
-                                className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={autoGenSettings.topics.includes(topic)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setAutoGenSettings({
-                                        ...autoGenSettings,
-                                        topics: [...autoGenSettings.topics, topic]
-                                      });
-                                    } else {
-                                      setAutoGenSettings({
-                                        ...autoGenSettings,
-                                        topics: autoGenSettings.topics.filter(t => t !== topic)
-                                      });
-                                    }
-                                  }}
-                                  className="h-4 w-4 rounded border-gray-300"
-                                />
-                                <span className="text-sm">{topic}</span>
-                              </label>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center py-2">
-                            {formData.subject ? 'No topics available for selected chapters' : 'Please select a subject and chapters first'}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                    {autoGenSettings.topics.length > 0 && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                          {autoGenSettings.topics.length} topic(s) selected
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAutoGenSettings({ ...autoGenSettings, topics: [] })}
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Question Type Selection */}
-                  <div>
-                    <Label className="mb-2 block">Select Question Types (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Choose specific question types to include
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 border rounded-lg bg-background p-3">
-                      {getAvailableQuestionTypes().map((type, index) => (
-                        <label
-                          key={index}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={autoGenSettings.questionTypes.includes(type)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAutoGenSettings({
-                                  ...autoGenSettings,
-                                  questionTypes: [...autoGenSettings.questionTypes, type]
-                                });
-                              } else {
-                                setAutoGenSettings({
-                                  ...autoGenSettings,
-                                  questionTypes: autoGenSettings.questionTypes.filter(qt => qt !== type)
-                                });
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <span className="text-sm capitalize">{type.replace('-', ' ')}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {autoGenSettings.questionTypes.length > 0 && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                          {autoGenSettings.questionTypes.length} question type(s) selected
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAutoGenSettings({ ...autoGenSettings, questionTypes: [] })}
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Specific Marks Selection */}
-                  <div>
-                    <Label className="mb-2 block">Select Specific Mark Values (Optional)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Choose specific mark values for questions (leave empty for any marks)
-                    </p>
-                    <div className="grid grid-cols-6 gap-2 border rounded-lg bg-background p-3">
-                      {getCommonMarkValues().map((marks, index) => (
-                        <label
-                          key={index}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-muted/30 p-2 rounded"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={autoGenSettings.specificMarks.includes(marks)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setAutoGenSettings({
-                                  ...autoGenSettings,
-                                  specificMarks: [...autoGenSettings.specificMarks, marks].sort((a, b) => a - b)
-                                });
-                              } else {
-                                setAutoGenSettings({
-                                  ...autoGenSettings,
-                                  specificMarks: autoGenSettings.specificMarks.filter(m => m !== marks)
-                                });
-                              }
-                            }}
-                            className="h-4 w-4 rounded border-gray-300"
-                          />
-                          <span className="text-sm">{marks}</span>
-                        </label>
-                      ))}
-                    </div>
-                    {autoGenSettings.specificMarks.length > 0 && (
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">
-                          {autoGenSettings.specificMarks.length} mark value(s) selected: {autoGenSettings.specificMarks.join(', ')}
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAutoGenSettings({ ...autoGenSettings, specificMarks: [] })}
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Difficulty Distribution */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <Label htmlFor="totalMarks">Total Marks</Label>
+          <TabsContent value="details" className="space-y-6 mt-6">
+            <form onSubmit={(e) => { e.preventDefault(); setCurrentTab('questions'); }} className="space-y-6">
+              {/* Test Information */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Test Title <span className="text-red-500">*</span></Label>
                       <Input
-                        id="totalMarks"
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        required
+                        placeholder="e.g., Midterm Exam - Mathematics"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject <span className="text-red-500">*</span></Label>
+                      <Select
+                        value={formData.subject}
+                        onValueChange={(value) => {
+                          setFormData({ ...formData, subject: value });
+                          setCommonFilters({ ...commonFilters, chapters: [], topics: [] });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a subject" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject._id} value={subject._id}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Test Period <span className="text-red-500">*</span></Label>
+                      <div className="flex flex-col gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="date"
+                              variant={"outline"}
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !dateRange && "text-muted-foreground"
+                              )}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {dateRange?.from ? (
+                                dateRange.to ? (
+                                  <>
+                                    {format(dateRange.from, "LLL dd, y")} -{" "}
+                                    {format(dateRange.to, "LLL dd, y")}
+                                  </>
+                                ) : (
+                                  format(dateRange.from, "LLL dd, y")
+                                )
+                              ) : (
+                                <span>Pick a date range</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              initialFocus
+                              mode="range"
+                              defaultMonth={dateRange?.from}
+                              selected={dateRange}
+                              onSelect={setDateRange}
+                              numberOfMonths={2}
+                              className="rounded-lg border shadow-sm"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <div className="flex gap-4">
+                          <div className="flex-1 space-y-1">
+                            <Label className="text-xs text-muted-foreground">Start Time</Label>
+                            <div className="relative">
+                              <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="time"
+                                className="pl-8"
+                                value={formData.scheduledTime}
+                                onChange={(e) => setFormData({ ...formData, scheduledTime: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-1 space-y-1">
+                            <Label className="text-xs text-muted-foreground">End Time</Label>
+                            <div className="relative">
+                              <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                type="time"
+                                className="pl-8"
+                                value={formData.deadlineTime}
+                                onChange={(e) => setFormData({ ...formData, deadlineTime: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="duration">Duration (minutes) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="duration"
                         type="number"
-                        value={autoGenSettings.totalMarks}
-                        onChange={(e) => setAutoGenSettings({ ...autoGenSettings, totalMarks: e.target.value })}
+                        value={formData.duration}
+                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                        required
                         min="1"
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="easyPercentage">Easy %</Label>
-                      <Input
-                        id="easyPercentage"
-                        type="number"
-                        value={autoGenSettings.easyPercentage}
-                        onChange={(e) => setAutoGenSettings({ ...autoGenSettings, easyPercentage: e.target.value })}
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="mediumPercentage">Medium %</Label>
-                      <Input
-                        id="mediumPercentage"
-                        type="number"
-                        value={autoGenSettings.mediumPercentage}
-                        onChange={(e) => setAutoGenSettings({ ...autoGenSettings, mediumPercentage: e.target.value })}
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="hardPercentage">Hard %</Label>
-                      <Input
-                        id="hardPercentage"
-                        type="number"
-                        value={autoGenSettings.hardPercentage}
-                        onChange={(e) => setAutoGenSettings({ ...autoGenSettings, hardPercentage: e.target.value })}
-                        min="0"
-                        max="100"
-                      />
+                      <div className="pt-4 flex items-center space-x-2">
+                        <Checkbox
+                          id="showResults"
+                          checked={formData.showResultsImmediately}
+                          onCheckedChange={(checked) => setFormData({ ...formData, showResultsImmediately: checked as boolean })}
+                        />
+                        <Label
+                          htmlFor="showResults"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Show results immediately after submission
+                        </Label>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Selection Summary */}
-                  {(autoGenSettings.chapters.length > 0 || 
-                    autoGenSettings.topics.length > 0 || 
-                    autoGenSettings.questionTypes.length > 0 || 
-                    autoGenSettings.specificMarks.length > 0) && (
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <h4 className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Selection Summary</h4>
-                      <div className="space-y-1 text-xs text-blue-700 dark:text-blue-400">
-                        {autoGenSettings.chapters.length > 0 && (
-                          <p><span className="font-medium">Chapters:</span> {autoGenSettings.chapters.join(', ')}</p>
-                        )}
-                        {autoGenSettings.topics.length > 0 && (
-                          <p><span className="font-medium">Topics:</span> {autoGenSettings.topics.join(', ')}</p>
-                        )}
-                        {autoGenSettings.questionTypes.length > 0 && (
-                          <p><span className="font-medium">Question Types:</span> {autoGenSettings.questionTypes.map(qt => qt.replace('-', ' ')).join(', ')}</p>
-                        )}
-                        {autoGenSettings.specificMarks.length > 0 && (
-                          <p><span className="font-medium">Mark Values:</span> {autoGenSettings.specificMarks.join(', ')}</p>
-                        )}
-                      </div>
-                      <div className="mt-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setAutoGenSettings({
-                            ...autoGenSettings,
-                            chapters: [],
-                            topics: [],
-                            questionTypes: [],
-                            specificMarks: []
-                          })}
-                          className="text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                        >
-                          Clear All Filters
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Enter test instructions or description..."
+                      rows={3}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
 
-                  <Button
-                    type="button"
-                    onClick={handleAutoGenerate}
-                    disabled={!formData.subject || loading}
+              {/* Student Assignment */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Student Assignment</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <RadioGroup
+                    value={assignmentType}
+                    onValueChange={(value) => setAssignmentType(value as 'individual' | 'group')}
+                    className="flex flex-col sm:flex-row gap-6"
                   >
-                    <Wand2 className="h-4 w-4 mr-2" />
-                    Generate Test
-                  </Button>
-                </div>
-              )}
-
-              {/* Manual Selection Mode */}
-              {mode === 'manual' && (
-                <div className="space-y-4">
-                  {/* Filters */}
-                  <div className="space-y-4 p-4 bg-muted/30 rounded-lg">
-                    {/* Search and basic filters */}
-                    <div className="grid grid-cols-4 gap-4">
-                      <div>
-                        <Label htmlFor="search">Search Questions</Label>
-                        <Input
-                          id="search"
-                          placeholder="Search questions..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="chapter-filter">Chapter</Label>
-                        <select
-                          id="chapter-filter"
-                          value={filters.chapter}
-                          onChange={(e) => setFilters({ ...filters, chapter: e.target.value })}
-                          className="flex h-10 w-full rounded-md border bg-background px-3 py-2"
-                          disabled={!formData.subject}
-                        >
-                          <option value="">All Chapters</option>
-                          {subjects
-                            .find(s => s._id === formData.subject)
-                            ?.chapters.map((chapter, index) => (
-                              <option key={index} value={chapter.name}>
-                                {chapter.name}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                      <div>
-                        <Label htmlFor="difficulty-filter">Difficulty</Label>
-                        <select
-                          id="difficulty-filter"
-                          value={filters.difficulty}
-                          onChange={(e) => setFilters({ ...filters, difficulty: e.target.value })}
-                          className="flex h-10 w-full rounded-md border bg-background px-3 py-2"
-                        >
-                          <option value="">All Difficulties</option>
-                          <option value="easy">Easy</option>
-                          <option value="medium">Medium</option>
-                          <option value="hard">Hard</option>
-                        </select>
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={fetchQuestions}
-                        disabled={!formData.subject}
-                        className="mt-6"
-                      >
-                        <Search className="h-4 w-4 mr-2" />
-                        Search
-                      </Button>
+                    <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="group" id="group" />
+                      <Label htmlFor="group" className="cursor-pointer flex-1">Assign to Group</Label>
                     </div>
-
-                    {/* Marks filter */}
-                    <div className="flex items-end gap-4">
-                      <div className="flex-1">
-                        <Label htmlFor="min-marks">Minimum Marks</Label>
-                        <Input
-                          id="min-marks"
-                          type="number"
-                          placeholder="e.g., 1"
-                          value={filters.minMarks}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Ensure minimum is not greater than maximum
-                            if (filters.maxMarks && value && parseInt(value) > parseInt(filters.maxMarks)) {
-                              return;
-                            }
-                            setFilters({ ...filters, minMarks: value });
-                          }}
-                          min="1"
-                          className={filters.maxMarks && filters.minMarks && parseInt(filters.minMarks) > parseInt(filters.maxMarks) ? 'border-red-500' : ''}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <Label htmlFor="max-marks">Maximum Marks</Label>
-                        <Input
-                          id="max-marks"
-                          type="number"
-                          placeholder="e.g., 10"
-                          value={filters.maxMarks}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Ensure maximum is not less than minimum
-                            if (filters.minMarks && value && parseInt(value) < parseInt(filters.minMarks)) {
-                              return;
-                            }
-                            setFilters({ ...filters, maxMarks: value });
-                          }}
-                          min="1"
-                          className={filters.maxMarks && filters.minMarks && parseInt(filters.maxMarks) < parseInt(filters.minMarks) ? 'border-red-500' : ''}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setFilters({ 
-                          ...filters, 
-                          chapter: '', 
-                          difficulty: '', 
-                          minMarks: '', 
-                          maxMarks: '' 
-                        })}
-                      >
-                        Clear Filters
-                      </Button>
+                    <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="individual" id="individual" />
+                      <Label htmlFor="individual" className="cursor-pointer flex-1">Assign to Individual Students</Label>
                     </div>
-                    
-                    {/* Filter status message */}
-                    {(filters.minMarks || filters.maxMarks) && (
-                      <div className="mt-2 text-sm text-blue-600 dark:text-blue-400">
-                        {filters.minMarks && filters.maxMarks 
-                          ? `Showing questions with ${filters.minMarks}-${filters.maxMarks} marks`
-                          : filters.minMarks 
-                          ? `Showing questions with ${filters.minMarks}+ marks`
-                          : `Showing questions with up to ${filters.maxMarks} marks`
-                        }
-                      </div>
-                    )}
-                  </div>
+                  </RadioGroup>
 
-                  {/* Available Questions */}
-                  {formData.subject && (
-                    <div className="max-h-96 overflow-y-auto border rounded-lg">
-                      <table className="min-w-full divide-y divide-border">
-                        <thead className="bg-muted/30 sticky top-0">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Q.No</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Question</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Chapter</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Difficulty</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Marks</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">View</th>
-                            <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-card divide-y divide-border">
-                          {questions.length === 0 ? (
-                            <tr>
-                              <td colSpan={7} className="px-4 py-4 text-center text-muted-foreground">
-                                No questions available. Please adjust filters or add questions to the bank.
-                              </td>
-                            </tr>
-                          ) : (
-                            questions.map((q, idx) => (
-                              <tr key={q._id} className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3">{`Q${idx + 1}`}</td>
-                                <td className="px-4 py-3 max-w-md truncate">{q.questionText}</td>
-                                <td className="px-4 py-3">{q.chapter}</td>
-                                <td className="px-4 py-3">
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs ${
-                                      q.difficultyLevel === 'easy'
-                                        ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-                                        : q.difficultyLevel === 'medium'
-                                        ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                                        : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                                    }`}
-                                  >
-                                    {q.difficultyLevel}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3">{q.marks}</td>
-                                <td className="px-4 py-3 text-center">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handlePreviewQuestion(q)}
-                                    className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                  >
-                                    <Eye className="h-3 w-3 mr-1" />
-                                    View
-                                  </Button>
-                                </td>
-                                <td className="px-4 py-3 text-center">
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleAddQuestion(q)}
-                                    disabled={selectedQuestions.some(sq => sq.question === q._id)}
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Add
-                                  </Button>
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
+                  {assignmentType === 'group' ? (
+                    <div className="space-y-2 max-w-md">
+                      <Label htmlFor="group-select">Select Group</Label>
+                      <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a student group" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((group) => (
+                            <SelectItem key={group._id} value={group._id}>
+                              {group.name} ({group.students.length} students)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </div>
-              )}
-
-              {/* Selected Questions */}
-              <div className="mt-6">
-                {/* Section Management */}
-                <div className="mb-6">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold">Test Sections</h3>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setIsAddingSectionMode(!isAddingSectionMode)}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Section
-                    </Button>
-                  </div>
-
-                  {/* Add Section Form */}
-                  {isAddingSectionMode && (
-                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="Enter section name (e.g., Section B, Part II)"
-                          value={newSectionName}
-                          onChange={(e) => setNewSectionName(e.target.value)}
-                          className="flex-1"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleAddSection();
-                            if (e.key === 'Escape') {
-                              setIsAddingSectionMode(false);
-                              setNewSectionName('');
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAddSection}
-                          className="bg-blue-600 hover:bg-blue-700"
-                        >
-                          Add
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setIsAddingSectionMode(false);
-                            setNewSectionName('');
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sections List */}
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {sections.map((section) => (
-                      <div key={section.id} className="flex items-center gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={selectedSectionForQuestion === section.id ? 'default' : 'outline'}
-                          onClick={() => setSelectedSectionForQuestion(section.id)}
-                          className={`${
-                            selectedSectionForQuestion === section.id
-                              ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                              : 'hover:bg-blue-50 dark:hover:bg-blue-900/20'
-                          }`}
-                        >
-                          {section.name}
-                          {selectedQuestions.filter(q => q.section === section.id).length > 0 && (
-                            <span className="ml-2 text-xs bg-white dark:bg-blue-800 text-blue-600 dark:text-blue-200 px-1.5 py-0.5 rounded-full">
-                              {selectedQuestions.filter(q => q.section === section.id).length}
-                            </span>
-                          )}
-                        </Button>
-                        {section.id !== 'default' && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleRemoveSection(section.id)}
-                            className="h-6 w-6 p-0 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            <Trash2 className="h-3 w-3" />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label>Select Students</Label>
+                        <div className="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={selectAllStudents}>
+                            Select All
                           </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={deselectAllStudents}>
+                            Deselect All
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="border rounded-md max-h-60 overflow-y-auto p-2 space-y-1 bg-muted/10">
+                        {students.map((student) => (
+                          <div
+                            key={student._id}
+                            className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
+                            onClick={() => toggleStudent(student._id)}
+                          >
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selectedStudents.includes(student._id)}
+                                onCheckedChange={() => toggleStudent(student._id)}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium">{student.name}</p>
+                              <p className="text-xs text-muted-foreground">{student.email}</p>
+                            </div>
+                          </div>
+                        ))}
+                        {students.length === 0 && (
+                          <p className="text-sm text-muted-foreground p-4 text-center">No students found.</p>
                         )}
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="text-xs text-muted-foreground mb-4">
-                    Questions will be added to <strong>{sections.find(s => s.id === selectedSectionForQuestion)?.name}</strong>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold">
-                    Selected Questions ({selectedQuestions.length})
-                  </h3>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm">
-                      Total Marks: <span className="font-bold text-blue-600 dark:text-blue-400">{getTotalMarks()}</span>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedStudents.length} student{selectedStudents.length !== 1 ? 's' : ''} selected
+                      </p>
                     </div>
-                    {selectedQuestions.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        Use ↑↓ buttons to reorder questions
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="flex justify-end">
+                <Button type="submit" size="lg">
+                  Next: Add Questions
+                </Button>
+              </div>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="questions" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+              {/* Left Column: Filters & Selection */}
+              <div className="lg:col-span-6 flex flex-col gap-4 h-full overflow-hidden">
+                <Card className="flex-1 flex flex-col overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">Questions</CardTitle>
+                      <div className="flex bg-muted rounded-lg p-1">
+                        <button
+                          onClick={() => setMode('manual')}
+                          className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'manual' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                          Manual
+                        </button>
+                        <button
+                          onClick={() => setMode('auto')}
+                          className={cn("px-3 py-1 text-xs font-medium rounded-md transition-all", mode === 'auto' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                        >
+                          Auto
+                        </button>
                       </div>
-                    )}
+                    </div>
+                  </CardHeader>
+                  <div className="px-6 pb-4 space-y-4 border-b">
+                    {/* Common Filters */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Chapters</Label>
+                        <MultiSelectCheckbox
+                          options={chapterOptions}
+                          selected={commonFilters.chapters}
+                          onChange={(selected) => setCommonFilters({ ...commonFilters, chapters: selected })}
+                          placeholder="Chapters"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Topics</Label>
+                        <MultiSelectCheckbox
+                          options={topicOptions}
+                          selected={commonFilters.topics}
+                          onChange={(selected) => setCommonFilters({ ...commonFilters, topics: selected })}
+                          placeholder="Topics"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Difficulty</Label>
+                        <MultiSelectCheckbox
+                          options={[
+                            { label: 'Easy', value: 'easy' },
+                            { label: 'Medium', value: 'medium' },
+                            { label: 'Hard', value: 'hard' },
+                          ]}
+                          selected={commonFilters.difficulty}
+                          onChange={(selected) => setCommonFilters({ ...commonFilters, difficulty: selected })}
+                          placeholder="Difficulty"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Marks</Label>
+                        <MultiSelectCheckbox
+                          options={['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '15', '20'].map(m => ({ label: m, value: m }))}
+                          selected={commonFilters.marks}
+                          onChange={(selected) => setCommonFilters({ ...commonFilters, marks: selected })}
+                          placeholder="Marks"
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                {selectedQuestions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
-                    No questions selected yet
-                  </div>
-                ) : (
-                  <div className="space-y-4 max-h-96 overflow-y-auto">
-                    {sections
-                      .filter(section => selectedQuestions.some(q => q.section === section.id))
-                      .sort((a, b) => a.order - b.order)
-                      .map((section) => {
-                        const sectionQuestions = selectedQuestions
-                          .filter(q => q.section === section.id)
-                          .sort((a, b) => a.order - b.order);
-
-                        return (
-                          <div key={section.id} className="border rounded-lg p-3 bg-card">
-                            <div className="flex items-center justify-between mb-3 pb-2 border-b">
-                              <h4 className="font-medium">{section.name}</h4>
-                              <span className="text-sm text-muted-foreground">
-                                {sectionQuestions.length} question{sectionQuestions.length !== 1 ? 's' : ''} • 
-                                {sectionQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
-                              </span>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              {sectionQuestions.map((sq, index) => {
-                                const question = getQuestionDetails(sq.question);
-                                const isFirst = index === 0;
-                                const isLast = index === sectionQuestions.length - 1;
-                                
-                                return (
-                                  <div
-                                    key={sq.question}
-                                    className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg border hover:border-primary/50 transition-colors"
-                                  >
-                                    {/* Question Order and Reorder Controls */}
-                                    <div className="flex flex-col items-center">
-                                      <span className="font-medium mb-1">#{sq.order}</span>
-                                      <div className="flex flex-col gap-1">
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={() => moveQuestionUp(sq.question)}
-                                          disabled={isFirst}
-                                          className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 disabled:opacity-30"
-                                          title="Move up"
-                                        >
-                                          <ChevronUp className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          variant="ghost"
-                                          onClick={() => moveQuestionDown(sq.question)}
-                                          disabled={isLast}
-                                          className="h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 disabled:opacity-30"
-                                          title="Move down"
-                                        >
-                                          <ChevronDown className="h-3 w-3" />
-                                        </Button>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Question Content */}
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-sm font-medium truncate">
-                                        {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
-                                      </p>
-                                      <div className="flex items-center gap-4 mt-1">
-                                        <p className="text-xs text-muted-foreground">
-                                          Chapter: {question?.chapter || 'N/A'}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                          Difficulty: <span className={`inline-block px-1 py-0.5 rounded text-xs ${
-                                            question?.difficultyLevel === 'easy'
-                                              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-                                              : question?.difficultyLevel === 'medium'
-                                              ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                                              : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                                          }`}>
-                                            {question?.difficultyLevel || 'N/A'}
-                                          </span>
-                                        </p>
-                                      </div>
-                                    </div>
-                                    
-                                    {/* Section Selector and Action Buttons */}
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex items-center gap-1">
-                                        <Label className="text-xs whitespace-nowrap">Section:</Label>
-                                        <select
-                                          value={sq.section || 'default'}
-                                          onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
-                                          className="text-xs border rounded px-2 py-1 bg-background"
-                                        >
-                                          {sections.map((sec) => (
-                                            <option key={sec.id} value={sec.id}>
-                                              {sec.name}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <Label className="text-xs whitespace-nowrap">Marks:</Label>
-                                        <Input
-                                          type="number"
-                                          value={sq.marks}
-                                          onChange={(e) =>
-                                            handleUpdateMarks(sq.question, Number(e.target.value))
-                                          }
-                                          className="w-16 h-8"
-                                          min="1"
-                                        />
-                                      </div>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => question && handlePreviewQuestion(question)}
-                                        className="text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                                        title="View full question"
-                                      >
-                                        <Eye className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleRemoveQuestion(sq.question)}
-                                        className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                        title="Remove question"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
+                  <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
+                    {mode === 'manual' ? (
+                      <>
+                        <div className="p-4 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search question text..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="pl-8"
+                            />
                           </div>
-                        );
-                      })}
-                    
-                    {/* Display orphaned questions (questions without valid sections) */}
-                    {(() => {
-                      const orphanedQuestions = selectedQuestions.filter(q => 
-                        !sections.some(section => section.id === q.section)
-                      );
-                      
-                      if (orphanedQuestions.length === 0) return null;
-                      
-                      return (
-                        <div className="border rounded-lg p-3 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                          <div className="flex items-center justify-between mb-3 pb-2 border-b border-yellow-200 dark:border-yellow-800">
-                            <h4 className="font-medium">
-                              ⚠️ Questions without section
-                            </h4>
-                            <span className="text-sm text-muted-foreground">
-                              {orphanedQuestions.length} question{orphanedQuestions.length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-2">
-                            These questions need to be assigned to a section
-                          </div>
-                          
-                          <div className="space-y-2">
-                            {orphanedQuestions.map((sq) => {
-                              const question = getQuestionDetails(sq.question);
-                              
-                              return (
-                                <div
-                                  key={sq.question}
-                                  className="flex items-center gap-3 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg border border-yellow-200 dark:border-yellow-800"
-                                >
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">
-                                      {question?.questionText ? (question.questionText.substring(0, 80) + (question.questionText.length > 80 ? '...' : '')) : 'Question'}
-                                    </p>
-                                    <div className="flex items-center gap-4 mt-1">
-                                      <p className="text-xs text-muted-foreground">
-                                        Chapter: {question?.chapter || 'N/A'}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        Marks: {sq.marks}
-                                      </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                          {questions.map((q) => {
+                            const isSelected = selectedQuestions.some(sq => sq.question === q._id);
+                            return (
+                              <div
+                                key={q._id}
+                                className={cn(
+                                  "p-3 border rounded-lg flex flex-col gap-2 transition-colors",
+                                  isSelected ? "bg-muted/50 border-primary/30" : "bg-card hover:border-primary/50"
+                                )}
+                              >
+                                <div className="flex justify-between items-start gap-2">
+                                  <div className="flex-1">
+                                    <div className="flex flex-wrap gap-1 mb-1">
+                                      <Badge variant="outline" className="text-[10px] h-5 px-1">{q.marks}m</Badge>
+                                      <Badge variant={q.difficultyLevel === 'easy' ? 'secondary' : 'default'} className="text-[10px] h-5 px-1 capitalize">{q.difficultyLevel}</Badge>
+                                      <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded truncate max-w-[100px]">{q.chapter}</span>
                                     </div>
-                                  </div>
-                                  
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                      <Label className="text-xs whitespace-nowrap">Assign to:</Label>
-                                      <select
-                                        value={sq.section || 'default'}
-                                        onChange={(e) => handleMoveQuestionToSection(sq.question, e.target.value)}
-                                        className="text-xs border rounded px-2 py-1 bg-background"
-                                      >
-                                        {sections.map((sec) => (
-                                          <option key={sec.id} value={sec.id}>
-                                            {sec.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleRemoveQuestion(sq.question)}
-                                      className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
-                                      title="Remove question"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
+                                    <p className="text-sm line-clamp-2 font-medium">{q.questionText}</p>
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Submit Buttons */}
-            <div className="flex gap-3 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate('/tests')}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleSaveAsDraft}
-                disabled={loading}
-              >
-                {loading ? 'Saving...' : (isEditMode ? 'Save Changes' : 'Save as Draft')}
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? (isEditMode ? 'Updating...' : 'Publishing...') : (isEditMode ? 'Update & Publish' : 'Publish Test')}
-              </Button>
-            </div>
-          </>
-        )}
-      </form>
-
-      {/* Question Preview Modal */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Question Preview</DialogTitle>
-          </DialogHeader>
-          
-          {previewQuestion && (
-            <div className="space-y-4">
-              {/* Question Header Info */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Chapter:</span>
-                  <p className="text-sm">{previewQuestion.chapter}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Topic:</span>
-                  <p className="text-sm">{previewQuestion.topic || 'N/A'}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Marks:</span>
-                  <p className="text-sm font-semibold">{previewQuestion.marks}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Difficulty:</span>
-                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                    previewQuestion.difficultyLevel === 'easy'
-                      ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-                      : previewQuestion.difficultyLevel === 'medium'
-                      ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                      : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
-                  }`}>
-                    {previewQuestion.difficultyLevel}
-                  </span>
-                </div>
-              </div>
-
-              {/* Question Text */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Question:</h3>
-                <div className="p-4 border rounded-lg bg-card">
-                  <div className="whitespace-pre-wrap">
-                    {renderQuestionTextWithAttachments(previewQuestion.questionText, previewQuestion.attachments)}
-                  </div>
-                  
-                  {/* Question Image */}
-                  {previewQuestion.questionImage && (
-                    <div className="mt-4">
-                      <img 
-                        src={previewQuestion.questionImage} 
-                        alt="Question attachment"
-                        className="max-w-full h-auto rounded border"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Options (for multiple choice questions) */}
-              {previewQuestion.options && previewQuestion.options.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Options:</h3>
-                  <div className="space-y-2">
-                    {previewQuestion.options.map((option, index) => (
-                      <div 
-                        key={index} 
-                        className={`p-3 border rounded-lg ${
-                          previewQuestion.correctAnswer === option 
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                            : 'bg-card'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-muted-foreground">
-                            {String.fromCharCode(65 + index)}.
-                          </span>
-                          <div className={previewQuestion.correctAnswer === option ? 'font-medium text-green-800 dark:text-green-400' : ''}>
-                            {renderQuestionTextWithAttachments(option, previewQuestion.attachments)}
-                          </div>
-                          {previewQuestion.correctAnswer === option && (
-                            <span className="ml-auto text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/20 px-2 py-1 rounded">
-                              Correct Answer
-                            </span>
+                                <div className="flex justify-end gap-2 mt-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 px-2 text-xs"
+                                    onClick={() => handlePreviewQuestion(q)}
+                                  >
+                                    <Eye className="h-3 w-3 mr-1" /> Preview
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={isSelected ? "secondary" : "default"}
+                                    className="h-7 px-3 text-xs"
+                                    onClick={() => isSelected ? handleRemoveQuestion(q._id) : handleAddQuestion(q)}
+                                    disabled={isSelected}
+                                  >
+                                    {isSelected ? 'Added' : 'Add'}
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {questions.length === 0 && (
+                            <div className="text-center py-8 text-muted-foreground">
+                              <Filter className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                              <p>No questions found.</p>
+                            </div>
                           )}
                         </div>
+                      </>
+                    ) : (
+                      <div className="p-6 space-y-6 overflow-y-auto">
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Total Marks Target</Label>
+                            <Input
+                              type="number"
+                              value={autoGenSettings.totalMarks}
+                              onChange={(e) => setAutoGenSettings({ ...autoGenSettings, totalMarks: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="space-y-3">
+                            <Label>Difficulty Distribution (%)</Label>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Easy</Label>
+                                <Input
+                                  type="number"
+                                  value={autoGenSettings.easyPercentage}
+                                  onChange={(e) => setAutoGenSettings({ ...autoGenSettings, easyPercentage: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Medium</Label>
+                                <Input
+                                  type="number"
+                                  value={autoGenSettings.mediumPercentage}
+                                  onChange={(e) => setAutoGenSettings({ ...autoGenSettings, mediumPercentage: e.target.value })}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Hard</Label>
+                                <Input
+                                  type="number"
+                                  value={autoGenSettings.hardPercentage}
+                                  onChange={(e) => setAutoGenSettings({ ...autoGenSettings, hardPercentage: e.target.value })}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button onClick={handleAutoGenerate} disabled={loading} className="w-full">
+                          {loading ? (
+                            <>
+                              <Wand2 className="mr-2 h-4 w-4 animate-spin" /> Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="mr-2 h-4 w-4" /> Generate Questions
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Right Column: Selected Questions & Sections */}
+              <div className="lg:col-span-6 h-full overflow-hidden flex flex-col">
+                <Card className="h-full flex flex-col overflow-hidden border-2 border-primary/10">
+                  <CardHeader className="pb-3 bg-muted/20">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">Test Structure</CardTitle>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="secondary" className="font-mono">
+                            Total Marks: {getTotalMarks()}
+                          </Badge>
+                          <Badge variant="outline" className="font-mono">
+                            {selectedQuestions.length} Questions
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
+                          Save as Draft
+                        </Button>
+                        <Button onClick={handleSubmit} disabled={loading}>
+                          {loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
+                    {/* Section Tabs */}
+                    <div className="px-4 pt-4 pb-2 border-b bg-background sticky top-0 z-10">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sections</Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setIsAddingSectionMode(true)}
+                          className="h-6 text-xs"
+                        >
+                          <Plus className="h-3 w-3 mr-1" /> Add Section
+                        </Button>
+                      </div>
+
+                      {isAddingSectionMode && (
+                        <div className="flex gap-2 mb-3 items-center bg-muted p-2 rounded-md">
+                          <Input
+                            value={newSectionName}
+                            onChange={(e) => setNewSectionName(e.target.value)}
+                            placeholder="Section Name"
+                            className="h-8 text-sm w-48"
+                            autoFocus
+                          />
+                          <Button size="sm" onClick={handleAddSection} className="h-8">Add</Button>
+                          <Button size="sm" variant="ghost" onClick={() => setIsAddingSectionMode(false)} className="h-8">Cancel</Button>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap gap-2">
+                        {sections.map(section => (
+                          <div
+                            key={section.id}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border transition-all cursor-pointer select-none group",
+                              selectedSectionForQuestion === section.id
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                : "bg-background hover:bg-accent hover:text-accent-foreground"
+                            )}
+                            onClick={() => setSelectedSectionForQuestion(section.id)}
+                          >
+                            <Layers className="h-3 w-3" />
+                            {renamingSectionId === section.id ? (
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                  value={renamingSectionName}
+                                  onChange={(e) => setRenamingSectionName(e.target.value)}
+                                  className="h-6 w-24 text-xs px-1 py-0 bg-background text-foreground"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSaveRenamedSection();
+                                    if (e.key === 'Escape') setRenamingSectionId(null);
+                                  }}
+                                />
+                                <Button size="icon" variant="ghost" className="h-5 w-5" onClick={handleSaveRenamedSection}>
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <>
+                                <span>{section.name}</span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div
+                                    className="hover:bg-primary-foreground/20 rounded-full p-0.5"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartRenamingSection(section);
+                                    }}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </div>
+                                  {section.id !== 'default' && (
+                                    <div
+                                      className="hover:bg-primary-foreground/20 rounded-full p-0.5"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemoveSection(section.id);
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Select a section above to view and manage its questions.
+                      </p>
+                    </div>
+
+                    {/* Questions List */}
+                    <div className="flex-1 overflow-y-auto p-4 bg-muted/10">
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        {sections.map(section => {
+                          const sectionQuestions = selectedQuestions.filter(q => q.section === section.id);
+                          // Only show the selected section
+                          if (section.id !== selectedSectionForQuestion) return null;
+
+                          return (
+                            <div key={section.id} className="mb-6 last:mb-0">
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="h-px flex-1 bg-border" />
+                                <span className="text-sm font-medium text-muted-foreground px-2 bg-background border rounded-full">
+                                  {section.name} <span className="text-xs opacity-70">({sectionQuestions.length})</span>
+                                </span>
+                                <div className="h-px flex-1 bg-border" />
+                              </div>
+
+                              <div className="space-y-2 min-h-[50px]">
+                                <SortableContext
+                                  items={sectionQuestions.map(q => q.question)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  {sectionQuestions.map((sq, idx) => {
+                                    const q = getQuestionDetails(sq.question);
+                                    if (!q) return null;
+
+                                    return (
+                                      <SortableQuestionItem
+                                        key={sq.question}
+                                        id={sq.question}
+                                        question={q}
+                                        index={idx}
+                                        onRemove={handleRemoveQuestion}
+                                        onUpdateMarks={handleUpdateMarks}
+                                        onMoveToSection={handleMoveQuestionToSection}
+                                        sections={sections}
+                                        sectionId={sq.section || 'default'}
+                                      />
+                                    );
+                                  })}
+                                </SortableContext>
+                                {sectionQuestions.length === 0 && (
+                                  <div className="text-center py-12 border-2 border-dashed rounded-lg text-muted-foreground">
+                                    <p className="text-sm">No questions in this section.</p>
+                                    <p className="text-xs mt-1">Select questions from the left panel to add them here.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </DndContext>
+
+                      {selectedQuestions.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
+                          <Layers className="h-12 w-12 mb-4" />
+                          <p>No questions added yet.</p>
+                          <p className="text-sm">Select questions from the left panel to build your test.</p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Question Preview Sheet */}
+      <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Question Details</SheetTitle>
+          </SheetHeader>
+          {previewQuestion && (
+            <div className="space-y-6 mt-6 px-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">{previewQuestion.questionType}</Badge>
+                  <Badge variant="outline">{previewQuestion.marks} Marks</Badge>
+                  <Badge className="capitalize" variant={previewQuestion.difficultyLevel === 'easy' ? 'secondary' : previewQuestion.difficultyLevel === 'medium' ? 'default' : 'destructive'}>
+                    {previewQuestion.difficultyLevel}
+                  </Badge>
+                  <Badge variant="outline">{previewQuestion.chapter}</Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Question</h4>
+                <div className="text-base p-4 bg-muted/30 rounded-lg border">
+                  {renderQuestionTextWithAttachments(previewQuestion.questionText, previewQuestion.attachments || [])}
+                </div>
+              </div>
+
+              {previewQuestion.options && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Options</h4>
+                  <div className="space-y-2">
+                    {previewQuestion.options.map((option, idx) => (
+                      <div key={idx} className="p-3 border rounded-lg flex gap-3 items-center">
+                        <span className="font-medium bg-muted w-6 h-6 flex items-center justify-center rounded-full text-xs shrink-0">
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        <span>{option}</span>
+                        {option === previewQuestion.correctAnswer && (
+                          <Badge variant="default" className="ml-auto bg-green-600 hover:bg-green-700">Correct</Badge>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Answer (for non-multiple choice questions) */}
-              {previewQuestion.correctAnswer && (!previewQuestion.options || previewQuestion.options.length === 0) && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Answer:</h3>
-                  <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-                    <div className="whitespace-pre-wrap">
-                      {renderQuestionTextWithAttachments(
-                        previewQuestion.correctAnswer, 
-                        previewQuestion.correctAnswerAttachments || previewQuestion.attachments
-                      )}
-                    </div>
+              {!previewQuestion.options && previewQuestion.correctAnswer && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Correct Answer</h4>
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-900">
+                    <p className="text-green-900 dark:text-green-300 font-medium">{previewQuestion.correctAnswer}</p>
                   </div>
-                </div>
-              )}
-
-              {/* Question Type */}
-              {previewQuestion.questionType && (
-                <div className="text-sm text-muted-foreground pt-4 border-t">
-                  <span className="font-medium">Question Type: </span>
-                  <span className="capitalize">{previewQuestion.questionType.replace('-', ' ')}</span>
                 </div>
               )}
             </div>
           )}
-        </DialogContent>
-      </Dialog>
-    </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Alert Dialog */}
+      <AlertDialog open={alertOpen} onOpenChange={setAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{alertConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {alertConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            {alertConfig.cancelLabel && (
+              <AlertDialogCancel>{alertConfig.cancelLabel}</AlertDialogCancel>
+            )}
+            <AlertDialogAction onClick={alertConfig.action}>
+              {alertConfig.actionLabel}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
