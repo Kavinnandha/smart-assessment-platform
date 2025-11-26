@@ -890,15 +890,19 @@ const CreateQuestionPage = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">Answer Attachments</CardTitle>
                       {correctAnswerAttachments.length > 0 && (
-                        <select
+                        <Select
                           value={formData.correctAnswerAttachmentPosition}
-                          onChange={(e) => setFormData({ ...formData, correctAnswerAttachmentPosition: e.target.value })}
-                          className="text-xs border rounded p-1"
+                          onValueChange={(value) => setFormData({ ...formData, correctAnswerAttachmentPosition: value })}
                         >
-                          <option value="before">Before</option>
-                          <option value="after">After</option>
-                          <option value="custom">Custom</option>
-                        </select>
+                          <SelectTrigger className="w-[100px] h-8 text-xs">
+                            <SelectValue placeholder="Position" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="before">Before</SelectItem>
+                            <SelectItem value="after">After</SelectItem>
+                            <SelectItem value="custom">Custom</SelectItem>
+                          </SelectContent>
+                        </Select>
                       )}
                     </div>
                   </CardHeader>

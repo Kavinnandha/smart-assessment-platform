@@ -11,21 +11,23 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
   try {
     const { testId, answers, timeTaken } = req.body;
 
-    // Check if submission already exists
-    const existing = await Submission.findOne({
-      test: testId,
-      student: req.user?.userId
-    });
-
-    if (existing) {
-      return res.status(400).json({ message: 'Submission already exists' });
-    }
-
     // Get test with questions populated
     const test = await Test.findById(testId).populate('questions.question');
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
     }
+
+    // Check if student has already submitted this test and if attempts are exhausted
+    const existingSubmissionsCount = await Submission.countDocuments({
+      test: testId,
+      student: req.user?.userId
+    });
+
+    if (existingSubmissionsCount >= (test.attempts || 1)) {
+      return res.status(400).json({ message: 'Maximum attempts exceeded for this test' });
+    }
+
+    const attemptNumber = existingSubmissionsCount + 1;
 
     // Auto-evaluate MCQ and True/False questions
     const evaluatedAnswers = await Promise.all(
@@ -50,8 +52,8 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
           const studentAnswer = answer.answer?.trim();
           const correctAnswer = question.correctAnswer?.trim();
 
-          const isCorrect = studentAnswer && correctAnswer && 
-                           studentAnswer.toLowerCase() === correctAnswer.toLowerCase();
+          const isCorrect = studentAnswer && correctAnswer &&
+            studentAnswer.toLowerCase() === correctAnswer.toLowerCase();
 
           return {
             question: answer.question,
@@ -73,7 +75,7 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
 
     // Calculate total marks obtained (only for auto-graded questions)
     const totalMarksObtained = evaluatedAnswers.reduce(
-      (sum, ans) => sum + (ans.marksObtained || 0), 
+      (sum, ans) => sum + (ans.marksObtained || 0),
       0
     );
 
@@ -91,7 +93,8 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
       totalMarksObtained: allAutoGradable ? totalMarksObtained : undefined,
       status: allAutoGradable ? 'evaluated' : 'submitted',
       evaluatedBy: allAutoGradable ? req.user?.userId : undefined,
-      evaluatedAt: allAutoGradable ? new Date() : undefined
+      evaluatedAt: allAutoGradable ? new Date() : undefined,
+      attemptNumber
     });
 
     await submission.save();
@@ -101,8 +104,8 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
 
     if (shouldShowResults) {
       // Show results immediately
-      res.status(201).json({ 
-        message: 'Submission created successfully', 
+      res.status(201).json({
+        message: 'Submission created successfully',
         submission,
         autoGraded: allAutoGradable,
         totalMarksObtained: allAutoGradable ? totalMarksObtained : undefined,
@@ -110,7 +113,7 @@ export const createSubmission = async (req: AuthRequest, res: Response) => {
       });
     } else {
       // Hide results until teacher publishes them
-      res.status(201).json({ 
+      res.status(201).json({
         message: 'Submission created successfully. Results will be available after teacher evaluation.',
         showResults: false
       });
@@ -196,8 +199,8 @@ export const evaluateSubmission = async (req: AuthRequest, res: Response) => {
         q => q.question._id.toString() === answer.question.toString()
       );
       if (testQuestion && answer.marksObtained > testQuestion.marks) {
-        return res.status(400).json({ 
-          message: `Marks obtained cannot exceed ${testQuestion.marks} for question ${answer.question}` 
+        return res.status(400).json({
+          message: `Marks obtained cannot exceed ${testQuestion.marks} for question ${answer.question}`
         });
       }
     }
@@ -266,9 +269,9 @@ export const bulkEvaluate = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({ 
+    res.json({
       message: `${updatedCount} submissions evaluated successfully`,
-      count: updatedCount 
+      count: updatedCount
     });
   } catch (error) {
     console.error('Bulk evaluate error:', error);
@@ -279,7 +282,7 @@ export const bulkEvaluate = async (req: AuthRequest, res: Response) => {
 export const exportSubmissions = async (req: AuthRequest, res: Response) => {
   try {
     const { testId } = req.query;
-    
+
     const submissions = await Submission.find({ test: testId })
       .populate('student', 'name email')
       .populate('test', 'title')
@@ -366,7 +369,7 @@ export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
 
     // Check submission status - allow pending and submitted
     if (submission.status === 'evaluated' && !forceReEvaluate) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Submission has already been evaluated. Use ?forceReEvaluate=true to re-evaluate.',
         currentStatus: submission.status,
         evaluatedAt: submission.evaluatedAt,
@@ -391,7 +394,7 @@ export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
 
     for (const answer of submission.answers) {
       const question = answer.question as any;
-      
+
       // Find the corresponding test question to get max marks
       const testQuestion = test.questions.find(
         (tq: any) => tq.question._id.toString() === question._id.toString()
@@ -426,12 +429,12 @@ export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
       );
 
       if (allAnswersGraded) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'No questions to evaluate. All questions are already graded (auto-graded or manually evaluated).',
           suggestion: 'Use ?forceReEvaluate=true to re-evaluate or use manual evaluation to adjust marks.'
         });
       } else {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: 'No subjective questions found to evaluate. Only MCQ/True-False questions exist or questions lack correct answers.',
           tip: 'Ensure questions have correctAnswer field populated in the database.'
         });
@@ -442,9 +445,9 @@ export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
     console.log(`🤖 Starting AI evaluation for ${evaluationRequests.length} answer(s)...`);
     console.log(`📚 Subject: ${test.subject?.name || 'Unknown'}`);
     console.log(`⏳ Estimated time: ${evaluationRequests.length * 3}-${evaluationRequests.length * 5} seconds\n`);
-    
+
     const evaluationResults = await batchEvaluateWithAI(evaluationRequests);
-    
+
     console.log(`✅ AI evaluation completed for ${evaluationResults.length} answer(s)\n`);
 
     // Update submission with AI evaluation results
@@ -515,7 +518,7 @@ export const aiEvaluateSubmission = async (req: AuthRequest, res: Response) => {
     });
   } catch (error) {
     console.error('AI Evaluate submission error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Server error during AI evaluation',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
@@ -619,7 +622,7 @@ export const aiEvaluateSingleAnswer = async (req: AuthRequest, res: Response) =>
     });
   } catch (error) {
     console.error('AI Evaluate answer error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Server error during AI evaluation',
       error: error instanceof Error ? error.message : 'Unknown error'
     });

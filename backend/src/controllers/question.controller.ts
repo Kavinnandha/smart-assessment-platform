@@ -119,11 +119,25 @@ export const updateQuestion = async (req: AuthRequest, res: Response) => {
 
 export const deleteQuestion = async (req: AuthRequest, res: Response) => {
   try {
-    const question = await Question.findByIdAndDelete(req.params.id);
+    const questionId = req.params.id;
+    const question = await Question.findById(questionId);
 
     if (!question) {
       return res.status(404).json({ message: 'Question not found' });
     }
+
+    // Integrity Check: Check if question is used in any Test
+    const Test = (await import('../models/Test.model')).default;
+    const testsWithQuestion = await Test.find({ 'questions.question': questionId }).select('title');
+
+    if (testsWithQuestion.length > 0) {
+      return res.status(409).json({
+        message: 'Cannot delete question due to existing dependencies',
+        dependencies: [`Used in ${testsWithQuestion.length} test(s): ${testsWithQuestion.map(t => t.title).join(', ')}`]
+      });
+    }
+
+    await Question.findByIdAndDelete(questionId);
 
     res.json({ message: 'Question deleted successfully' });
   } catch (error) {

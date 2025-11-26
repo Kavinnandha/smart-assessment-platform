@@ -18,6 +18,7 @@ export interface ISubmission extends Document {
   evaluatedAt?: Date;
   timeTaken?: number; // in minutes
   status: 'submitted' | 'evaluated' | 'pending';
+  attemptNumber: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,6 +77,10 @@ const submissionSchema = new Schema<ISubmission>(
       type: String,
       enum: ['submitted', 'evaluated', 'pending'],
       default: 'pending'
+    },
+    attemptNumber: {
+      type: Number,
+      default: 1
     }
   },
   {
@@ -84,7 +89,7 @@ const submissionSchema = new Schema<ISubmission>(
 );
 
 // Indexes
-submissionSchema.index({ test: 1, student: 1 }, { unique: true });
+submissionSchema.index({ test: 1, student: 1, attemptNumber: 1 }, { unique: true });
 submissionSchema.index({ student: 1 });
 submissionSchema.index({ status: 1 });
 

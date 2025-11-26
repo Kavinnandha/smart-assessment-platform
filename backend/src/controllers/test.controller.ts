@@ -9,21 +9,21 @@ export const createTest = async (req: AuthRequest, res: Response) => {
   try {
     // If assignedGroups is provided, populate assignedTo with students from those groups
     let assignedStudents = req.body.assignedTo || [];
-    
+
     if (req.body.assignedGroups && req.body.assignedGroups.length > 0) {
       // Fetch all groups and extract student IDs
       const groups = await Group.find({ _id: { $in: req.body.assignedGroups } });
       const studentIds = new Set(assignedStudents); // Use Set to avoid duplicates
-      
+
       groups.forEach(group => {
         group.students.forEach(studentId => {
           studentIds.add(studentId.toString());
         });
       });
-      
+
       assignedStudents = Array.from(studentIds);
     }
-    
+
     const test = new Test({
       ...req.body,
       assignedTo: assignedStudents,
@@ -35,7 +35,7 @@ export const createTest = async (req: AuthRequest, res: Response) => {
     await test.populate('subject', 'name');
     await test.populate('assignedGroups', 'name');
     await test.populate('assignedTo', 'name email');
-    
+
     res.status(201).json({ message: 'Test created successfully', test });
   } catch (error) {
     console.error('Create test error:', error);
@@ -45,18 +45,18 @@ export const createTest = async (req: AuthRequest, res: Response) => {
 
 export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
   try {
-    const { 
-      subject, 
-      totalMarks, 
-      easyPercentage, 
-      mediumPercentage, 
-      hardPercentage, 
-      topics, 
-      title, 
-      duration, 
-      chapters, 
-      questionTypes, 
-      specificMarks 
+    const {
+      subject,
+      totalMarks,
+      easyPercentage,
+      mediumPercentage,
+      hardPercentage,
+      topics,
+      title,
+      duration,
+      chapters,
+      questionTypes,
+      specificMarks
     } = req.body;
 
     // Calculate marks distribution
@@ -100,7 +100,7 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
       if (specificMarks && specificMarks.length > 0) {
         filterCriteria.push(`mark value${specificMarks.length > 1 ? 's' : ''}: ${specificMarks.join(', ')}`);
       }
-      
+
       const message = filterCriteria.length > 0
         ? `No questions found matching the selected criteria: ${filterCriteria.join(', ')}`
         : 'No questions found for the selected subject';
@@ -153,11 +153,11 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
       if (specificMarks && specificMarks.length > 0) {
         filterCriteria.push(`mark value${specificMarks.length > 1 ? 's' : ''}: ${specificMarks.join(', ')}`);
       }
-      
-      const criteriaText = filterCriteria.length > 0 
+
+      const criteriaText = filterCriteria.length > 0
         ? ` with the selected criteria (${filterCriteria.join(', ')})`
         : '';
-      
+
       const message = `No suitable questions found${criteriaText} matching the difficulty distribution and total marks. Try adjusting the difficulty percentages, total marks, or selection criteria.`;
       return res.status(404).json({ message });
     }
@@ -180,7 +180,7 @@ export const autoGenerateTest = async (req: AuthRequest, res: Response) => {
     });
 
     // Return the selected questions without saving the test
-    res.status(200).json({ 
+    res.status(200).json({
       message: 'Questions auto-generated successfully',
       questions: questionsWithDetails,
       distribution: {
@@ -212,25 +212,25 @@ export const getTests = async (req: AuthRequest, res: Response) => {
       // Teachers can see:
       // 1. Tests assigned to groups where they are teachers (ALL teachers in the group can see)
       // 2. Tests they created with individual student assignment (ONLY creator can see)
-      
+
       // Find all groups where the teacher is assigned
-      const teacherGroups = await Group.find({ 
-        teachers: req.user.userId 
+      const teacherGroups = await Group.find({
+        teachers: req.user.userId
       }).select('_id');
-      
+
       const teacherGroupIds = teacherGroups.map(g => g._id);
-      
+
       // Build OR conditions:
       filter.$or = [
         // Condition 1: Tests assigned to groups where this teacher is a member
         // This allows ALL teachers in the group to see and manage the test
         { assignedGroups: { $in: teacherGroupIds } },
-        
+
         // Condition 2: Tests created by this teacher with no group assignment
         // This is for individual student assignments (makeup tests, etc.)
         // ONLY the creator can see these tests
-        { 
-          createdBy: req.user.userId, 
+        {
+          createdBy: req.user.userId,
           $or: [
             { assignedGroups: { $exists: true, $size: 0 } },  // Empty array
             { assignedGroups: { $exists: false } }             // Field doesn't exist (backward compatibility)
@@ -277,21 +277,21 @@ export const updateTest = async (req: AuthRequest, res: Response) => {
   try {
     // If assignedGroups is provided, populate assignedTo with students from those groups
     let updateData = { ...req.body };
-    
+
     if (req.body.assignedGroups && req.body.assignedGroups.length > 0) {
       // Fetch all groups and extract student IDs
       const groups = await Group.find({ _id: { $in: req.body.assignedGroups } });
       const studentIds = new Set(req.body.assignedTo || []); // Use Set to avoid duplicates
-      
+
       groups.forEach(group => {
         group.students.forEach(studentId => {
           studentIds.add(studentId.toString());
         });
       });
-      
+
       updateData.assignedTo = Array.from(studentIds);
     }
-    
+
     const test = await Test.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -315,11 +315,33 @@ export const updateTest = async (req: AuthRequest, res: Response) => {
 
 export const deleteTest = async (req: AuthRequest, res: Response) => {
   try {
-    const test = await Test.findByIdAndDelete(req.params.id);
+    const testId = req.params.id;
+    const force = req.query.force === 'true';
+
+    const test = await Test.findById(testId);
 
     if (!test) {
       return res.status(404).json({ message: 'Test not found' });
     }
+
+    // Integrity Check: Check for Submissions
+    const Submission = (await import('../models/Submission.model')).default;
+    const submissionCount = await Submission.countDocuments({ test: testId });
+
+    if (submissionCount > 0 && !force) {
+      return res.status(409).json({
+        message: 'Cannot delete test due to existing dependencies',
+        dependencies: [`Has ${submissionCount} student submission(s)`],
+        canCascade: true
+      });
+    }
+
+    // If force is true or no submissions, delete submissions first (cascade)
+    if (submissionCount > 0 && force) {
+      await Submission.deleteMany({ test: testId });
+    }
+
+    await Test.findByIdAndDelete(testId);
 
     res.json({ message: 'Test deleted successfully' });
   } catch (error) {

@@ -11,23 +11,23 @@ const router = express.Router();
 router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     let subjects;
-    
+
     // If user is a teacher, filter subjects based on assigned groups
     if (req.user?.role === UserRole.TEACHER) {
       // Find all groups where the teacher is assigned
-      const teacherGroups = await Group.find({ 
-        teachers: req.user.userId 
+      const teacherGroups = await Group.find({
+        teachers: req.user.userId
       }).distinct('subject');
-      
+
       // Get only the subjects from those groups
-      subjects = await Subject.find({ 
-        _id: { $in: teacherGroups } 
+      subjects = await Subject.find({
+        _id: { $in: teacherGroups }
       }).sort({ name: 1 });
     } else {
       // For admin and students, show all subjects
       subjects = await Subject.find().sort({ name: 1 });
     }
-    
+
     res.json(subjects);
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Server error' });
@@ -78,7 +78,7 @@ router.put('/:id', authenticate, authorize(UserRole.ADMIN), async (req, res) => 
 
     // Check if another subject has the same name
     if (name) {
-      const existingSubject = await Subject.findOne({ 
+      const existingSubject = await Subject.findOne({
         name: name.trim(),
         _id: { $ne: req.params.id }
       });
@@ -110,10 +110,44 @@ router.put('/:id', authenticate, authorize(UserRole.ADMIN), async (req, res) => 
 // Delete subject (Admin only)
 router.delete('/:id', authenticate, authorize(UserRole.ADMIN), async (req, res) => {
   try {
-    const subject = await Subject.findByIdAndDelete(req.params.id);
+    const subjectId = req.params.id;
+
+    const subject = await Subject.findById(subjectId);
     if (!subject) {
       return res.status(404).json({ message: 'Subject not found' });
     }
+
+    // Integrity Checks
+    const dependencies: string[] = [];
+
+    // 1. Check if used in any Group
+    const groupsWithSubject = await Group.find({ subject: subjectId }).select('name');
+    if (groupsWithSubject.length > 0) {
+      dependencies.push(`Used in ${groupsWithSubject.length} group(s): ${groupsWithSubject.map(g => g.name).join(', ')}`);
+    }
+
+    // 2. Check if used in any Question
+    const Question = (await import('../models/Question.model')).default;
+    const questionsWithSubject = await Question.countDocuments({ subject: subjectId });
+    if (questionsWithSubject > 0) {
+      dependencies.push(`Used in ${questionsWithSubject} question(s)`);
+    }
+
+    // 3. Check if used in any Test
+    const Test = (await import('../models/Test.model')).default;
+    const testsWithSubject = await Test.find({ subject: subjectId }).select('title');
+    if (testsWithSubject.length > 0) {
+      dependencies.push(`Used in ${testsWithSubject.length} test(s): ${testsWithSubject.map(t => t.title).join(', ')}`);
+    }
+
+    if (dependencies.length > 0) {
+      return res.status(409).json({
+        message: 'Cannot delete subject due to existing dependencies',
+        dependencies
+      });
+    }
+
+    await Subject.findByIdAndDelete(subjectId);
     res.json({ message: 'Subject deleted successfully' });
   } catch (error: any) {
     res.status(500).json({ message: error.message || 'Server error' });
@@ -169,7 +203,7 @@ router.put('/:id/chapters/:chapterIndex', authenticate, authorize(UserRole.ADMIN
     }
 
     // Check if new chapter name already exists (excluding current index)
-    const existingIndex = subject.chapters.findIndex((ch, idx) => 
+    const existingIndex = subject.chapters.findIndex((ch, idx) =>
       ch.name === name.trim() && idx !== chapterIndex
     );
     if (existingIndex !== -1) {
@@ -231,7 +265,7 @@ router.post('/:id/chapters/:chapterIndex/topics', authenticate, authorize(UserRo
     }
 
     const chapter = subject.chapters[chapterIndex];
-    
+
     // Check if topic already exists in this chapter
     if (chapter.topics.includes(topic.trim())) {
       return res.status(400).json({ message: 'Topic already exists in this chapter' });
@@ -273,7 +307,7 @@ router.put('/:id/chapters/:chapterIndex/topics/:topicIndex', authenticate, autho
     }
 
     // Check if new topic name already exists (excluding current index)
-    const existingIndex = chapter.topics.findIndex((t, idx) => 
+    const existingIndex = chapter.topics.findIndex((t, idx) =>
       t === topic.trim() && idx !== topicIndex
     );
     if (existingIndex !== -1) {

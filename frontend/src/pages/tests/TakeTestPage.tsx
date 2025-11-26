@@ -1,10 +1,23 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +111,15 @@ const TakeTestPage = () => {
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [testStarted, setTestStarted] = useState(false);
+  const { setLabel } = useBreadcrumb();
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    action: () => void;
+    actionLabel?: string;
+  }>({ title: '', description: '', action: () => { } });
+  const [checkingSubmission, setCheckingSubmission] = useState(true);
 
   const isStudent = user?.role === 'student';
   const isTakingTest = location.pathname.includes('/tests/take/');
@@ -122,6 +144,8 @@ const TakeTestPage = () => {
       }
     } catch (error) {
       console.error('Failed to check submissions:', error);
+    } finally {
+      setCheckingSubmission(false);
     }
   };
 
@@ -147,6 +171,7 @@ const TakeTestPage = () => {
       const response = await api.get(`/tests/${id}`);
       const fetchedTest = response.data.test;
       setTest(fetchedTest);
+      setLabel(fetchedTest._id, fetchedTest.title);
 
       // Initialize answers for students
       if (isStudent) {
@@ -183,34 +208,51 @@ const TakeTestPage = () => {
     if (!test) return;
 
     const unanswered = answers.filter(a => !a.answer.trim()).length;
+
+    const submitAction = async () => {
+      setSubmitting(true);
+      try {
+        const response = await api.post('/submissions', {
+          testId: test._id,
+          answers: answers,
+          timeTaken: (test.duration * 60) - timeRemaining
+        });
+
+        const { autoGraded, totalMarksObtained } = response.data;
+
+        if (autoGraded) {
+          // Use a simple alert for success as we are navigating away
+          alert(`Test submitted and auto-graded successfully!\n\nYour Score: ${totalMarksObtained} / ${test.totalMarks} marks`);
+        } else {
+          alert('Test submitted successfully! Results will be available after manual evaluation.');
+        }
+
+        navigate('/tests');
+      } catch (error: any) {
+        console.error('Failed to submit test:', error);
+        alert(error.response?.data?.message || 'Failed to submit test');
+      } finally {
+        setSubmitting(false);
+        setConfirmDialogOpen(false);
+      }
+    };
+
     if (unanswered > 0) {
-      if (!window.confirm(`You have ${unanswered} unanswered question(s). Do you want to submit anyway?`)) {
-        return;
-      }
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await api.post('/submissions', {
-        testId: test._id,
-        answers: answers,
-        timeTaken: (test.duration * 60) - timeRemaining
+      setConfirmConfig({
+        title: 'Unanswered Questions',
+        description: `You have ${unanswered} unanswered question(s). Do you want to submit anyway?`,
+        action: submitAction,
+        actionLabel: 'Submit Anyway'
       });
-
-      const { autoGraded, totalMarksObtained } = response.data;
-
-      if (autoGraded) {
-        alert(`Test submitted and auto-graded successfully!\n\nYour Score: ${totalMarksObtained} / ${test.totalMarks} marks`);
-      } else {
-        alert('Test submitted successfully! Results will be available after manual evaluation.');
-      }
-
-      navigate('/tests');
-    } catch (error: any) {
-      console.error('Failed to submit test:', error);
-      alert(error.response?.data?.message || 'Failed to submit test');
-    } finally {
-      setSubmitting(false);
+      setConfirmDialogOpen(true);
+    } else {
+      setConfirmConfig({
+        title: 'Submit Test',
+        description: 'Are you sure you want to submit this test? You cannot undo this action.',
+        action: submitAction,
+        actionLabel: 'Submit Test'
+      });
+      setConfirmDialogOpen(true);
     }
   };
 
@@ -1003,6 +1045,16 @@ const TakeTestPage = () => {
 
   // Student view - Test taking interface
   if (isStudent && isTakingTest) {
+    if (checkingSubmission) {
+      return (
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-card p-6 rounded-lg shadow text-center">
+            <p className="text-muted-foreground">Checking submission status...</p>
+          </div>
+        </div>
+      );
+    }
+
     // Check if student has already submitted this test
     if (alreadySubmitted) {
       return (
@@ -1122,7 +1174,7 @@ const TakeTestPage = () => {
 
     // Test in progress
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Timer and Header */}
         <div className="bg-white p-4 rounded-lg shadow mb-4 sticky top-0 z-10">
           <div className="flex items-center justify-between">
@@ -1531,10 +1583,10 @@ const TakeTestPage = () => {
                           )}
                           <span
                             className={`px-2 py-0.5 rounded-full ${item.question.difficultyLevel === 'easy'
-                                ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
-                                : item.question.difficultyLevel === 'medium'
-                                  ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
-                                  : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
+                              ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400'
+                              : item.question.difficultyLevel === 'medium'
+                                ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400'
+                                : 'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                               }`}
                           >
                             {item.question.difficultyLevel}
@@ -1551,6 +1603,23 @@ const TakeTestPage = () => {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmConfig.action}>
+              {confirmConfig.actionLabel || 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

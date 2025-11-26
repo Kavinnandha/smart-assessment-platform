@@ -248,10 +248,6 @@ export default function SubjectsPage() {
     setDeleteConfirmation({ isOpen: true, type, data });
   };
 
-  const handleCloseDeleteDialog = () => {
-    setDeleteConfirmation({ ...deleteConfirmation, isOpen: false });
-  };
-
   const handleConfirmDelete = async () => {
     const { type, data } = deleteConfirmation;
 
@@ -263,7 +259,13 @@ export default function SubjectsPage() {
         toast.success('Subject deleted successfully');
         handleCloseDeleteDialog();
       } catch (err: any) {
-        toast.error(err.response?.data?.message || `Failed to delete ${type}`);
+        if (err.response?.status === 409 && err.response?.data?.dependencies) {
+          const dependencies = err.response.data.dependencies;
+          toast.error(`Cannot delete subject: ${dependencies.join('. ')}`);
+        } else {
+          const errorMessage = err.response?.data?.message || `Failed to delete ${type}`;
+          toast.error(errorMessage);
+        }
       } finally {
         setSubmitting(false);
       }

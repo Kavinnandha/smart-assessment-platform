@@ -77,8 +77,8 @@ export const createGroup = async (req: Request, res: Response) => {
       });
 
       if (validStudents.length !== students.length) {
-        return res.status(400).json({ 
-          message: 'Some student IDs are invalid or not students' 
+        return res.status(400).json({
+          message: 'Some student IDs are invalid or not students'
         });
       }
     }
@@ -91,8 +91,8 @@ export const createGroup = async (req: Request, res: Response) => {
       });
 
       if (validTeachers.length !== teachers.length) {
-        return res.status(400).json({ 
-          message: 'Some teacher IDs are invalid or not teachers' 
+        return res.status(400).json({
+          message: 'Some teacher IDs are invalid or not teachers'
         });
       }
     }
@@ -151,8 +151,8 @@ export const updateGroup = async (req: Request, res: Response) => {
       });
 
       if (validStudents.length !== students.length) {
-        return res.status(400).json({ 
-          message: 'Some student IDs are invalid or not students' 
+        return res.status(400).json({
+          message: 'Some student IDs are invalid or not students'
         });
       }
     }
@@ -165,8 +165,8 @@ export const updateGroup = async (req: Request, res: Response) => {
       });
 
       if (validTeachers.length !== teachers.length) {
-        return res.status(400).json({ 
-          message: 'Some teacher IDs are invalid or not teachers' 
+        return res.status(400).json({
+          message: 'Some teacher IDs are invalid or not teachers'
         });
       }
     }
@@ -214,6 +214,17 @@ export const deleteGroup = async (req: Request, res: Response) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // Integrity Check: Check if group is assigned to any Test
+    const Test = (await import('../models/Test.model')).default;
+    const testsWithGroup = await Test.find({ assignedGroups: id }).select('title');
+
+    if (testsWithGroup.length > 0) {
+      return res.status(409).json({
+        message: 'Cannot delete group due to existing dependencies',
+        dependencies: [`Assigned to ${testsWithGroup.length} test(s): ${testsWithGroup.map(t => t.title).join(', ')}`]
+      });
+    }
+
     await Group.findByIdAndDelete(id);
 
     res.json({ message: 'Group deleted successfully' });
@@ -253,8 +264,8 @@ export const addStudentsToGroup = async (req: Request, res: Response) => {
     });
 
     if (validStudents.length !== students.length) {
-      return res.status(400).json({ 
-        message: 'Some student IDs are invalid or not students' 
+      return res.status(400).json({
+        message: 'Some student IDs are invalid or not students'
       });
     }
 
@@ -276,9 +287,9 @@ export const addStudentsToGroup = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error adding students to group:', error);
-    res.status(500).json({ 
-      message: 'Failed to add students to group', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to add students to group',
+      error: error.message
     });
   }
 };
@@ -323,9 +334,9 @@ export const removeStudentsFromGroup = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error removing students from group:', error);
-    res.status(500).json({ 
-      message: 'Failed to remove students from group', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to remove students from group',
+      error: error.message
     });
   }
 };

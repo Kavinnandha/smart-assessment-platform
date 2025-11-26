@@ -30,6 +30,8 @@ export interface ITest extends Document {
   isPublished: boolean;
   resultsPublished: boolean; // New field to control result visibility
   showResultsImmediately: boolean; // New field to control when results are shown
+  attempts: number;
+  showCorrectAnswers: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -122,6 +124,14 @@ const testSchema = new Schema<ITest>(
       default: false
     },
     showResultsImmediately: {
+      type: Boolean,
+      default: false
+    },
+    attempts: {
+      type: Number,
+      default: 1
+    },
+    showCorrectAnswers: {
       type: Boolean,
       default: false
     }

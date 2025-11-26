@@ -257,9 +257,15 @@ export default function StudentGroupsPage() {
       handleCloseDeleteDialog();
       toast.success('Group deleted successfully');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to delete group';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      if (err.response?.status === 409 && err.response?.data?.dependencies) {
+        const dependencies = err.response.data.dependencies;
+        setError(`Cannot delete group: ${dependencies.join('. ')}`);
+        toast.error('Cannot delete group due to dependencies');
+      } else {
+        const errorMessage = err.response?.data?.message || 'Failed to delete group';
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -362,8 +368,7 @@ export default function StudentGroupsPage() {
 
                 <div className="mb-4">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
-                    <BookOpen className="h-3 w-3" />
-                    {group.subject.name}
+                    {group.subject?.name || 'Unknown Subject'}
                   </span>
                 </div>
 

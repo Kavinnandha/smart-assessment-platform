@@ -171,9 +171,14 @@ const SubjectQuestionsPage = () => {
       toast.success('Question deleted successfully');
       fetchSubjectAndQuestions();
       handleCloseDeleteDialog();
-    } catch (error) {
-      console.error('Failed to delete question:', error);
-      toast.error('Failed to delete question');
+    } catch (error: any) {
+      if (error.response?.status === 409 && error.response?.data?.dependencies) {
+        const dependencies = error.response.data.dependencies;
+        toast.error(`Cannot delete question: ${dependencies.join('. ')}`);
+      } else {
+        console.error('Failed to delete question:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete question');
+      }
     }
   };
 

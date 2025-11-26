@@ -63,6 +63,7 @@ interface Question {
   options?: string[];
   correctAnswer?: string;
   attachments?: any[];
+  correctAnswerAttachments?: any[];
 }
 
 interface Student {
@@ -70,7 +71,6 @@ interface Student {
   name: string;
   email: string;
 }
-
 interface Group {
   _id: string;
   name: string;
@@ -299,6 +299,7 @@ const CreateTestPage = () => {
   const [initialLoading, setInitialLoading] = useState(false);
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [initialPublishedStatus, setInitialPublishedStatus] = useState(false);
 
   // Alert Dialog States
   const [alertOpen, setAlertOpen] = useState(false);
@@ -317,7 +318,8 @@ const CreateTestPage = () => {
     duration: '60',
     scheduledTime: '09:00',
     deadlineTime: '12:00',
-    showResultsImmediately: false
+    showResultsImmediately: false,
+    attempts: '1'
   });
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
@@ -425,21 +427,24 @@ const CreateTestPage = () => {
         subject: typeof test.subject === 'object' ? test.subject._id : test.subject,
         description: test.description || '',
         duration: test.duration.toString(),
-        scheduledTime: test.scheduledFor ? new Date(test.scheduledFor).toTimeString().slice(0, 5) : '09:00',
+        scheduledTime: test.scheduledDate ? new Date(test.scheduledDate).toTimeString().slice(0, 5) : '09:00',
         deadlineTime: test.deadline ? new Date(test.deadline).toTimeString().slice(0, 5) : '12:00',
-        showResultsImmediately: test.showResultsImmediately || false
+        showResultsImmediately: test.showResultsImmediately || false,
+        attempts: test.attempts ? test.attempts.toString() : '1'
       });
 
-      if (test.scheduledFor && test.deadline) {
+      setInitialPublishedStatus(test.isPublished);
+
+      if (test.scheduledDate && test.deadline) {
         setDateRange({
-          from: new Date(test.scheduledFor),
+          from: new Date(test.scheduledDate),
           to: new Date(test.deadline)
         });
       }
 
       if (test.sections && test.sections.length > 0) {
         setSections(test.sections.map((s: any) => ({
-          id: s.name, // Using name as ID for simplicity if ID not present, but ideally use ID
+          id: s.id || s.name.toLowerCase().replace(/\s+/g, '-'),
           name: s.name,
           description: s.description,
           order: s.order || 1
@@ -456,12 +461,12 @@ const CreateTestPage = () => {
       setSelectedQuestions(mappedQuestions);
 
       // Handle assignments
-      if (test.assignedToGroups && test.assignedToGroups.length > 0) {
+      if (test.assignedGroups && test.assignedGroups.length > 0) {
         setAssignmentType('group');
-        setSelectedGroup(test.assignedToGroups[0]);
-      } else if (test.assignedToStudents && test.assignedToStudents.length > 0) {
+        setSelectedGroup(test.assignedGroups[0]._id || test.assignedGroups[0]);
+      } else if (test.assignedTo && test.assignedTo.length > 0) {
         setAssignmentType('individual');
-        setSelectedStudents(test.assignedToStudents);
+        setSelectedStudents(test.assignedTo.map((s: any) => s._id || s));
       }
 
     } catch (error) {
@@ -705,15 +710,33 @@ const CreateTestPage = () => {
   };
 
   const renderQuestionTextWithAttachments = (text: string, attachments: any[]) => {
-    // Simplified rendering for preview
+    const backendBaseUrl = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('/api', '')
+      : 'http://localhost:5000';
+
     return (
       <div>
         <p className="whitespace-pre-wrap">{text}</p>
         {attachments && attachments.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {attachments.map((att, idx) => (
-              <div key={idx} className="text-xs border p-2 rounded">
-                {att.fileName}
+              <div key={idx} className="border rounded-lg overflow-hidden bg-background">
+                {att.fileType?.startsWith('image/') ? (
+                  <div className="relative aspect-video bg-muted">
+                    <img
+                      src={`${backendBaseUrl}${att.fileUrl}`}
+                      alt={att.fileName}
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-3 flex items-center gap-2">
+                    <div className="h-8 w-8 bg-muted rounded flex items-center justify-center">
+                      <span className="text-xs font-bold uppercase">{att.fileType?.split('/')[1] || 'FILE'}</span>
+                    </div>
+                    <span className="text-xs font-medium truncate flex-1">{att.fileName}</span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -744,25 +767,34 @@ const CreateTestPage = () => {
     return [];
   };
 
-  const handleSubmit = async () => {
+  const validateForm = () => {
     if (!formData.title || !formData.subject || !formData.duration) {
-      showAlert('Error', 'Please fill in all required fields');
-      return;
+      showAlert('Error', 'Please fill in all required fields (Title, Subject, Duration)');
+      return false;
     }
 
     if (selectedQuestions.length === 0) {
       showAlert('Error', 'Please add at least one question');
-      return;
+      return false;
     }
 
-    await createTest(true);
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    if (isEditMode) {
+      // In edit mode, preserve the existing published status
+      await createTest(initialPublishedStatus);
+    } else {
+      // In create mode, publish immediately
+      await createTest(true);
+    }
   };
 
   const handleSaveAsDraft = async () => {
-    if (selectedQuestions.length === 0) {
-      showAlert('Error', 'Please add at least one question');
-      return;
-    }
+    if (!validateForm()) return;
 
     await createTest(false);
   };
@@ -803,7 +835,7 @@ const CreateTestPage = () => {
         duration: parseInt(formData.duration),
         totalMarks,
         passingMarks: Math.ceil(totalMarks * 0.4), // Default 40%
-        scheduledFor: scheduledDateISO,
+        scheduledDate: scheduledDateISO,
         deadline: deadlineDateISO,
         questions: selectedQuestions.map(sq => ({
           question: sq.question,
@@ -812,14 +844,16 @@ const CreateTestPage = () => {
           section: sq.section
         })),
         sections: sections.map(s => ({
+          id: s.id,
           name: s.name,
           description: s.description,
           order: s.order
         })),
-        assignedToStudents: assignmentType === 'individual' ? assignedStudents : [],
-        assignedToGroups: assignmentType === 'group' ? assignedGroups : [],
-        status: publish ? 'published' : 'draft',
-        showResultsImmediately: formData.showResultsImmediately
+        assignedTo: assignmentType === 'individual' ? assignedStudents : [],
+        assignedGroups: assignmentType === 'group' ? assignedGroups : [],
+        isPublished: publish,
+        showResultsImmediately: formData.showResultsImmediately,
+        attempts: parseInt(formData.attempts)
       };
 
       if (isEditMode) {
@@ -872,6 +906,14 @@ const CreateTestPage = () => {
           </h1>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate('/tests')}>Cancel</Button>
+            {!isEditMode && (
+              <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
+                {loading ? 'Saving...' : 'Save as Draft'}
+              </Button>
+            )}
+            <Button onClick={handleSubmit} disabled={loading}>
+              {loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create & Publish')}
+            </Button>
           </div>
         </div>
 
@@ -998,20 +1040,33 @@ const CreateTestPage = () => {
                         required
                         min="1"
                       />
-                      <div className="pt-4 flex items-center space-x-2">
-                        <Checkbox
-                          id="showResults"
-                          checked={formData.showResultsImmediately}
-                          onCheckedChange={(checked) => setFormData({ ...formData, showResultsImmediately: checked as boolean })}
-                        />
-                        <Label
-                          htmlFor="showResults"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          Show results immediately after submission
-                        </Label>
-                      </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="attempts">Number of Attempts <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="attempts"
+                        type="number"
+                        value={formData.attempts}
+                        onChange={(e) => setFormData({ ...formData, attempts: e.target.value })}
+                        required
+                        min="1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex items-center space-x-2">
+                    <Checkbox
+                      id="showResults"
+                      checked={formData.showResultsImmediately}
+                      onCheckedChange={(checked) => setFormData({ ...formData, showResultsImmediately: checked as boolean })}
+                    />
+                    <Label
+                      htmlFor="showResults"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Show results immediately after submission
+                    </Label>
                   </div>
 
                   <div className="space-y-2">
@@ -1478,12 +1533,6 @@ const CreateTestPage = () => {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline" onClick={handleSaveAsDraft} disabled={loading}>
-                            Save as Draft
-                          </Button>
-                          <Button onClick={handleSubmit} disabled={loading}>
-                            {loading ? 'Saving...' : (isEditMode ? 'Update' : 'Create')}
-                          </Button>
                         </div>
                       </div>
                     </CardHeader>
@@ -1705,7 +1754,41 @@ const CreateTestPage = () => {
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-muted-foreground">Correct Answer</h4>
                   <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-900">
-                    <p className="text-green-900 dark:text-green-300 font-medium">{previewQuestion.correctAnswer}</p>
+                    <p className="text-green-900 dark:text-green-300 font-medium whitespace-pre-wrap">{previewQuestion.correctAnswer}</p>
+
+                    {previewQuestion.correctAnswerAttachments && previewQuestion.correctAnswerAttachments.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800">
+                        <p className="text-xs font-medium text-green-800 dark:text-green-400 mb-2">Answer Attachments:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {previewQuestion.correctAnswerAttachments.map((att, idx) => {
+                            const backendBaseUrl = import.meta.env.VITE_API_URL
+                              ? import.meta.env.VITE_API_URL.replace('/api', '')
+                              : 'http://localhost:5000';
+
+                            return (
+                              <div key={idx} className="border border-green-200 dark:border-green-800 rounded-lg overflow-hidden bg-background/50">
+                                {att.fileType?.startsWith('image/') ? (
+                                  <div className="relative aspect-video bg-muted/50">
+                                    <img
+                                      src={`${backendBaseUrl}${att.fileUrl}`}
+                                      alt={att.fileName}
+                                      className="absolute inset-0 w-full h-full object-contain"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="p-3 flex items-center gap-2">
+                                    <div className="h-8 w-8 bg-muted/50 rounded flex items-center justify-center">
+                                      <span className="text-xs font-bold uppercase">{att.fileType?.split('/')[1] || 'FILE'}</span>
+                                    </div>
+                                    <span className="text-xs font-medium truncate flex-1">{att.fileName}</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Plus, Calendar, Clock, Users, FileText, Trash2, Eye, EyeOff, Edit, ClipboardList, PlayCircle, CheckCircle } from 'lucide-react';
+import { Plus, Calendar, Clock, Users, FileText, Trash2, Eye, EyeOff, Edit, ClipboardList, PlayCircle, CheckCircle, Search, Filter, ArrowUpDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Tooltip,
   TooltipContent,
@@ -21,6 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+import { toast } from 'sonner';
 
 interface Test {
   _id: string;
@@ -56,6 +60,33 @@ const TestsPage = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [testToDelete, setTestToDelete] = useState<string | null>(null);
+  const [cascadeDeleteId, setCascadeDeleteId] = useState<string | null>(null);
+
+  const [cascadeDeleteDialogOpen, setCascadeDeleteDialogOpen] = useState(false);
+
+  // Search, Filter, Sort State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterSubject, setFilterSubject] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all'); // all, published, draft
+  const [sortBy, setSortBy] = useState<string>('createdAt'); // createdAt, title, duration
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Generic Confirmation Dialog State
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    action: () => void;
+    actionLabel?: string;
+    variant?: 'default' | 'destructive';
+  }>({
+    title: '',
+    description: '',
+    action: () => { },
+    actionLabel: 'Confirm',
+    variant: 'default'
+  });
+
   const isStudent = user?.role === 'student';
   const isTeacher = user?.role === 'teacher' || user?.role === 'admin';
 
@@ -100,73 +131,137 @@ const TestsPage = () => {
 
     try {
       await api.delete(`/tests/${testToDelete}`);
-      // alert('Test deleted successfully'); // Removed alert for better UX
+      toast.success('Test deleted successfully');
       fetchTests();
-    } catch (error) {
-      console.error('Failed to delete test:', error);
-      alert('Failed to delete test');
-    } finally {
       setDeleteDialogOpen(false);
       setTestToDelete(null);
+    } catch (error: any) {
+      if (error.response?.status === 409 && error.response?.data?.canCascade) {
+        // Close the normal delete dialog and open the cascade confirmation
+        setDeleteDialogOpen(false);
+        setCascadeDeleteId(testToDelete);
+        setTestToDelete(null);
+        setCascadeDeleteDialogOpen(true);
+      } else {
+        console.error('Failed to delete test:', error);
+        toast.error(error.response?.data?.message || 'Failed to delete test');
+        setDeleteDialogOpen(false);
+        setTestToDelete(null);
+      }
+    }
+  };
+
+  const handleForceDelete = async () => {
+    if (!cascadeDeleteId) return;
+
+    try {
+      await api.delete(`/tests/${cascadeDeleteId}?force=true`);
+      toast.success('Test and all submissions deleted successfully');
+      fetchTests();
+    } catch (error: any) {
+      console.error('Failed to force delete test:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete test');
+    } finally {
+      setCascadeDeleteDialogOpen(false);
+      setCascadeDeleteId(null);
     }
   };
 
   const handlePublish = async (id: string) => {
     try {
       await api.patch(`/tests/${id}/publish`);
-      alert('Test published successfully');
+      toast.success('Test published successfully');
       fetchTests();
     } catch (error) {
       console.error('Failed to publish test:', error);
-      alert('Failed to publish test');
+      toast.error('Failed to publish test');
     }
   };
 
-  const handleUnpublish = async (id: string) => {
-    if (!window.confirm('Are you sure you want to unpublish this test? Students will no longer see it.')) {
-      return;
-    }
-
-    try {
-      await api.patch(`/tests/${id}/unpublish`);
-      alert('Test unpublished successfully');
-      fetchTests();
-    } catch (error) {
-      console.error('Failed to unpublish test:', error);
-      alert('Failed to unpublish test');
-    }
+  const handleUnpublish = (id: string) => {
+    setConfirmConfig({
+      title: 'Unpublish Test',
+      description: 'Are you sure you want to unpublish this test? Students will no longer see it.',
+      action: async () => {
+        try {
+          await api.patch(`/tests/${id}/unpublish`);
+          toast.success('Test unpublished successfully');
+          fetchTests();
+        } catch (error) {
+          console.error('Failed to unpublish test:', error);
+          toast.error('Failed to unpublish test');
+        }
+        setConfirmDialogOpen(false);
+      },
+      actionLabel: 'Unpublish',
+      variant: 'destructive'
+    });
+    setConfirmDialogOpen(true);
   };
 
   const handlePublishResults = async (id: string) => {
     try {
       await api.patch(`/tests/${id}/publish-results`);
-      alert('Test results published successfully');
+      toast.success('Test results published successfully');
       fetchTests();
     } catch (error) {
       console.error('Failed to publish results:', error);
-      alert('Failed to publish results');
+      toast.error('Failed to publish results');
     }
   };
 
-  const handleUnpublishResults = async (id: string) => {
-    if (!window.confirm('Are you sure you want to unpublish the results? Students will no longer see their scores.')) {
-      return;
-    }
-
-    try {
-      await api.patch(`/tests/${id}/unpublish-results`);
-      alert('Test results unpublished successfully');
-      fetchTests();
-    } catch (error) {
-      console.error('Failed to unpublish results:', error);
-      alert('Failed to unpublish results');
-    }
+  const handleUnpublishResults = (id: string) => {
+    setConfirmConfig({
+      title: 'Unpublish Results',
+      description: 'Are you sure you want to unpublish the results? Students will no longer see their scores.',
+      action: async () => {
+        try {
+          await api.patch(`/tests/${id}/unpublish-results`);
+          toast.success('Test results unpublished successfully');
+          fetchTests();
+        } catch (error) {
+          console.error('Failed to unpublish results:', error);
+          toast.error('Failed to unpublish results');
+        }
+        setConfirmDialogOpen(false);
+      },
+      actionLabel: 'Unpublish Results',
+      variant: 'destructive'
+    });
+    setConfirmDialogOpen(true);
   };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleString();
   };
+
+  const filteredTests = tests.filter(test => {
+    const matchesSearch = test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      test.subject?.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesSubject = filterSubject === 'all' || test.subject?._id === filterSubject || test.subject?.name === filterSubject;
+
+    const matchesStatus = filterStatus === 'all' ||
+      (filterStatus === 'published' && test.isPublished) ||
+      (filterStatus === 'draft' && !test.isPublished);
+
+    return matchesSearch && matchesSubject && matchesStatus;
+  }).sort((a, b) => {
+    let comparison = 0;
+    if (sortBy === 'title') {
+      comparison = a.title.localeCompare(b.title);
+    } else if (sortBy === 'duration') {
+      comparison = a.duration - b.duration;
+    } else if (sortBy === 'createdAt') {
+      comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    }
+
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
+
+  // Get unique subjects for filter
+  const uniqueSubjects = Array.from(new Set(tests.map(t => t.subject?.name).filter(Boolean)));
 
   return (
     <div className="space-y-6">
@@ -180,6 +275,68 @@ const TestsPage = () => {
             </Button>
           </Link>
         )}
+      </div>
+
+      <div className="bg-card p-4 rounded-lg shadow space-y-4 md:space-y-0 md:flex md:items-center md:gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tests..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Select value={filterSubject} onValueChange={setFilterSubject}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                <SelectValue placeholder="Subject" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Subjects</SelectItem>
+              {uniqueSubjects.map(subject => (
+                <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-full sm:w-[150px]">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4" />
+                <SelectValue placeholder="Sort By" />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="createdAt">Date Created</SelectItem>
+              <SelectItem value="title">Title</SelectItem>
+              <SelectItem value="duration">Duration</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            <ArrowUpDown className={`h-4 w-4 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} />
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -204,7 +361,7 @@ const TestsPage = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-          {tests.map((test) => (
+          {filteredTests.map((test) => (
             <div
               key={test._id}
               className="bg-card p-4 sm:p-6 rounded-lg shadow hover:shadow-lg transition-shadow"
@@ -422,6 +579,46 @@ const TestsPage = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700">
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={cascadeDeleteDialogOpen} onOpenChange={setCascadeDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Test with Submissions</AlertDialogTitle>
+            <AlertDialogDescription>
+              This test has existing submissions. Deleting it will also permanently delete all student submissions and results.
+              <br /><br />
+              <strong>Are you absolutely sure you want to proceed?</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleForceDelete} className="bg-red-600 hover:bg-red-700">
+              Delete Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Generic Confirmation Dialog */}
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmConfig.action}
+              className={confirmConfig.variant === 'destructive' ? "bg-red-600 hover:bg-red-700" : ""}
+            >
+              {confirmConfig.actionLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

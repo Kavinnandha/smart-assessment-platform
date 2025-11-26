@@ -191,9 +191,14 @@ const UsersPage = () => {
       handleCloseDeleteDialog();
       toast.success('User deleted successfully');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to delete user';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      if (err.response?.status === 409 && err.response?.data?.dependencies) {
+        const dependencies = err.response.data.dependencies;
+        toast.error(`Cannot delete user: ${dependencies.join('. ')}`);
+      } else {
+        const errorMessage = err.response?.data?.message || 'Failed to delete user';
+        setError(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
       setSubmitting(false);
     }

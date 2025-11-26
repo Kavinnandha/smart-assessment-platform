@@ -5,7 +5,8 @@ import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Save, User, Calendar, Clock, FileText, CheckCircle, AlertCircle, Download, File, Sparkles, Loader2 } from 'lucide-react';
+import { useBreadcrumb } from '@/contexts/BreadcrumbContext';
+import { ArrowLeft, User, Calendar, Clock, FileText, CheckCircle, AlertCircle, Download, File, Sparkles, Loader2, Save, Eye, EyeOff } from 'lucide-react';
 
 interface Question {
   _id: string;
@@ -56,6 +57,7 @@ interface Submission {
       question: Question;
       marks: number;
     }[];
+    showCorrectAnswers?: boolean;
   };
   student: {
     _id: string;
@@ -79,16 +81,17 @@ const EvaluatePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { setLabel } = useBreadcrumb();
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aiEvaluating, setAiEvaluating] = useState(false);
   const [evaluatedAnswers, setEvaluatedAnswers] = useState<EvaluatedAnswer[]>([]);
-  
+
   // Get API base URL for file uploads
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const FILE_BASE_URL = API_BASE_URL.replace('/api', '');
-  
+
   const isStudent = user?.role === 'student';
 
   useEffect(() => {
@@ -101,7 +104,15 @@ const EvaluatePage = () => {
       const fetchedSubmission = response.data.submission;
       console.log('Fetched submission:', fetchedSubmission);
       console.log('Test questions:', fetchedSubmission.test?.questions);
-      
+
+      // Set breadcrumb label
+      if (fetchedSubmission) {
+        const label = user?.role === 'student'
+          ? fetchedSubmission.test.title
+          : `${fetchedSubmission.student.name} - ${fetchedSubmission.test.title}`;
+        setLabel(id!, label);
+      }
+
       // Check if results are available (if answers array is empty and it's a student viewing)
       if (isStudent && fetchedSubmission.answers.length === 0 && fetchedSubmission.test?.questions?.length > 0) {
         // Results are not yet available for students
@@ -112,7 +123,7 @@ const EvaluatePage = () => {
       } else {
         setSubmission(fetchedSubmission);
       }
-      
+
       // Initialize evaluated answers with existing data or defaults
       const initialAnswers = fetchedSubmission.answers.map((ans: Answer) => ({
         question: ans.question._id,
@@ -164,7 +175,9 @@ const EvaluatePage = () => {
     setAiEvaluating(true);
     try {
       const response = await api.put(`/submissions/${id}/ai-evaluate`);
-      
+
+      const maxMarks = submission.test.totalMarks;
+
       alert(
         `AI Evaluation Completed!\n\n` +
         `Questions Evaluated: ${response.data.evaluationDetails.totalQuestionsEvaluated}\n` +
@@ -172,7 +185,7 @@ const EvaluatePage = () => {
         `Subject: ${response.data.evaluationDetails.subject}\n\n` +
         `The submission has been updated with AI evaluation results. You can review and adjust marks if needed.`
       );
-      
+
       // Reload submission to get updated marks and remarks
       await fetchSubmission();
     } catch (error: any) {
@@ -193,7 +206,7 @@ const EvaluatePage = () => {
       const testQuestion = submission.test.questions.find(
         q => q.question._id === answer.question
       );
-      
+
       if (testQuestion && answer.marksObtained! > testQuestion.marks) {
         alert(`Marks for question ${i + 1} cannot exceed ${testQuestion.marks}`);
         return;
@@ -222,7 +235,7 @@ const EvaluatePage = () => {
         testId: submission.test._id,
         answers: completeAnswers
       });
-      
+
       alert('Submission evaluated successfully!');
       navigate(isStudent ? '/tests' : `/tests/submissions?testId=${submission.test._id}`);
     } catch (error: any) {
@@ -230,6 +243,37 @@ const EvaluatePage = () => {
       alert(error.response?.data?.message || 'Failed to evaluate submission');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleShowCorrectAnswers = async () => {
+    if (!submission) return;
+
+    const newValue = !submission.test.showCorrectAnswers;
+    const confirmMsg = newValue
+      ? "Are you sure you want to show correct answers to students? They will be able to see the correct answers when viewing their results."
+      : "Are you sure you want to hide correct answers from students?";
+
+    if (window.confirm(confirmMsg)) {
+      try {
+        await api.put(`/tests/${submission.test._id}`, {
+          showCorrectAnswers: newValue
+        });
+
+        // Update local state
+        setSubmission(prev => prev ? ({
+          ...prev,
+          test: {
+            ...prev.test,
+            showCorrectAnswers: newValue
+          }
+        }) : null);
+
+        alert(`Correct answers are now ${newValue ? 'visible' : 'hidden'} for students.`);
+      } catch (error) {
+        console.error('Failed to update settings:', error);
+        alert('Failed to update settings');
+      }
     }
   };
 
@@ -305,7 +349,7 @@ const EvaluatePage = () => {
 
     return (
       <div className="font-medium mb-3">
-        {parts.map((part, idx) => 
+        {parts.map((part, idx) =>
           typeof part === 'string' ? <span key={idx}>{part}</span> : part
         )}
       </div>
@@ -322,7 +366,7 @@ const EvaluatePage = () => {
       <div key={idx} className="inline-block w-full">
         {attachment.fileType.startsWith('image/') ? (
           <div className="space-y-2">
-            <img 
+            <img
               src={`${FILE_BASE_URL}${attachment.fileUrl}`}
               alt={attachment.fileName}
               className="max-w-2xl rounded-lg border shadow-sm"
@@ -332,7 +376,7 @@ const EvaluatePage = () => {
         ) : (
           <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900/20 border rounded-lg max-w-md">
             <File className="w-5 h-5 text-gray-500 dark:text-gray-400 shrink-0" />
-            <a 
+            <a
               href={`${FILE_BASE_URL}${attachment.fileUrl}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -349,7 +393,7 @@ const EvaluatePage = () => {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="bg-white p-6 rounded-lg shadow text-center">
           <p className="text-gray-600">Loading submission...</p>
         </div>
@@ -359,7 +403,7 @@ const EvaluatePage = () => {
 
   if (!submission) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="bg-white p-6 rounded-lg shadow text-center">
           <p className="text-red-600">Submission not found</p>
           <Button onClick={() => navigate('/tests')} className="mt-4">
@@ -372,7 +416,7 @@ const EvaluatePage = () => {
 
   if (submission.resultsRestricted) {
     return (
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <Button
             variant="outline"
@@ -394,7 +438,7 @@ const EvaluatePage = () => {
               Your teacher needs to publish the results before you can see your score and evaluation.
             </p>
           </div>
-          
+
           <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg mb-6">
             <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">Test Information</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -432,7 +476,7 @@ const EvaluatePage = () => {
   const percentage = maxMarks > 0 ? (totalMarks / maxMarks) * 100 : 0;
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <Button
@@ -444,6 +488,28 @@ const EvaluatePage = () => {
         </Button>
 
         <div className="flex items-center gap-3">
+          {/* Show/Hide Correct Answers - Only for Teachers */}
+          {!isStudent && (
+            <Button
+              variant="outline"
+              onClick={handleToggleShowCorrectAnswers}
+              className="gap-2"
+              title={submission.test.showCorrectAnswers ? "Hide correct answers from students" : "Show correct answers to students"}
+            >
+              {submission.test.showCorrectAnswers ? (
+                <>
+                  <Eye className="h-4 w-4" />
+                  <span className="hidden sm:inline">Answers Visible</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="h-4 w-4" />
+                  <span className="hidden sm:inline">Answers Hidden</span>
+                </>
+              )}
+            </Button>
+          )}
+
           {/* AI Evaluate Button - Only for Teachers */}
           {!isStudent && (submission.status === 'pending' || submission.status === 'submitted') && (
             <Button
@@ -484,7 +550,7 @@ const EvaluatePage = () => {
         <h1 className="text-2xl font-bold mb-4">
           {submission.test.title}
         </h1>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div className="flex items-center gap-3">
             <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -545,19 +611,17 @@ const EvaluatePage = () => {
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4">
                 <div
-                  className={`h-4 rounded-full transition-all ${
-                    percentage >= 75 ? 'bg-green-600 dark:bg-green-500' :
+                  className={`h-4 rounded-full transition-all ${percentage >= 75 ? 'bg-green-600 dark:bg-green-500' :
                     percentage >= 50 ? 'bg-yellow-600 dark:bg-yellow-500' :
-                    'bg-red-600 dark:bg-red-500'
-                  }`}
+                      'bg-red-600 dark:bg-red-500'
+                    }`}
                   style={{ width: `${Math.min(percentage, 100)}%` }}
                 />
               </div>
-              <span className={`text-xl font-bold ${
-                percentage >= 75 ? 'text-green-600 dark:text-green-400' :
+              <span className={`text-xl font-bold ${percentage >= 75 ? 'text-green-600 dark:text-green-400' :
                 percentage >= 50 ? 'text-yellow-600 dark:text-yellow-400' :
-                'text-red-600 dark:text-red-400'
-              }`}>
+                  'text-red-600 dark:text-red-400'
+                }`}>
                 {percentage.toFixed(1)}%
               </span>
             </div>
@@ -578,14 +642,14 @@ const EvaluatePage = () => {
             }
           );
           const maxMarks = testQuestion?.marks || answer.question?.marks || 0;
-          
+
           console.log('Question matching:', {
             index,
             answerQuestionId: answer.question._id,
             testQuestion: testQuestion,
             maxMarks
           });
-          
+
           const evaluatedAnswer = evaluatedAnswers.find(
             a => a.question === answer.question._id
           );
@@ -600,162 +664,172 @@ const EvaluatePage = () => {
                 </div>
 
                 <div className="flex-1">
-                  {/* Question */}
-                  <div className="mb-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground mb-1">
-                          Q{index + 1}
-                        </p>
-                        {renderQuestionWithAttachments(answer.question.questionText, answer.question.attachments)}
-                        {answer.question.questionImage && (
-                          <img 
-                            src={answer.question.questionImage} 
-                            alt="Question" 
-                            className="max-w-md rounded-lg border mb-2"
-                          />
-                        )}
-                        <div className="flex gap-4 text-sm text-muted-foreground">
-                          <span>Chapter: {answer.question.chapter}</span>
-                          {answer.question.topic && <span>Topic: {answer.question.topic}</span>}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      {/* Question */}
+                      <div className="mb-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              Q{index + 1}
+                            </p>
+                            {renderQuestionWithAttachments(answer.question.questionText, answer.question.attachments)}
+                            {answer.question.questionImage && (
+                              <img
+                                src={answer.question.questionImage}
+                                alt="Question"
+                                className="max-w-md rounded-lg border mb-2"
+                              />
+                            )}
+                            <div className="flex gap-4 text-sm text-muted-foreground">
+                              <span>Chapter: {answer.question.chapter}</span>
+                              {answer.question.topic && <span>Topic: {answer.question.topic}</span>}
+                            </div>
+                          </div>
+                          <span className="ml-4 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-full text-sm font-medium shrink-0">
+                            {maxMarks} marks
+                          </span>
                         </div>
                       </div>
-                      <span className="ml-4 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-full text-sm font-medium shrink-0">
-                        {maxMarks} marks
-                      </span>
+
+                      {/* Student's Answer */}
+                      <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">
+                          {isStudent ? 'Your Answer:' : "Student's Answer:"}
+                        </p>
+                        <p className="whitespace-pre-wrap">
+                          {answer.answer || answer.answerText || 'No answer provided'}
+                        </p>
+                      </div>
+
+                      {/* Reference Answer Attachments - Show to teachers OR if enabled for students */}
+                      {(!isStudent || submission.test.showCorrectAnswers) && answer.question.correctAnswerAttachments && answer.question.correctAnswerAttachments.length > 0 && (
+                        <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                          <p className="text-sm font-medium text-green-900 dark:text-green-400 mb-3 flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            Reference Answer Attachments
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {answer.question.correctAnswerAttachments.map((attachment, idx) => {
+                              const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
+                              return (
+                                <div key={idx} className="border border-green-300 dark:border-green-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+                                  {attachment.fileType.startsWith('image/') ? (
+                                    <div className="relative">
+                                      <img
+                                        src={fileUrl}
+                                        alt={attachment.fileName}
+                                        className="w-full h-48 object-contain bg-gray-50 dark:bg-gray-900"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center justify-center h-48 bg-gray-50 dark:bg-gray-900">
+                                      <File className="w-12 h-12 text-gray-400 dark:text-gray-600" />
+                                    </div>
+                                  )}
+                                  <div className="p-2 border-t border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs font-medium text-green-900 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 truncate block"
+                                    >
+                                      {attachment.fileName}
+                                    </a>
+                                    <p className="text-xs text-green-700 dark:text-green-500">
+                                      {(attachment.fileSize / 1024).toFixed(2)} KB
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
 
-                  {/* Student's Answer */}
-                  <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg border">
-                    <p className="text-sm font-medium text-muted-foreground mb-2">
-                      {isStudent ? 'Your Answer:' : "Student's Answer:"}
-                    </p>
-                    <p className="whitespace-pre-wrap">
-                      {answer.answer || answer.answerText || 'No answer provided'}
-                    </p>
-                  </div>
-
-                  {/* Reference Answer Attachments - Only show to teachers */}
-                  {!isStudent && answer.question.correctAnswerAttachments && answer.question.correctAnswerAttachments.length > 0 && (
-                    <div className="mb-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                      <p className="text-sm font-medium text-green-900 dark:text-green-400 mb-3 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        Reference Answer Attachments
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {answer.question.correctAnswerAttachments.map((attachment, idx) => {
-                          const fileUrl = `${FILE_BASE_URL}${attachment.fileUrl}`;
-                          return (
-                            <div key={idx} className="border border-green-300 dark:border-green-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
-                              {attachment.fileType.startsWith('image/') ? (
-                                <div className="relative">
-                                  <img 
-                                    src={fileUrl}
-                                    alt={attachment.fileName}
-                                    className="w-full h-48 object-contain bg-gray-50 dark:bg-gray-900"
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-center h-48 bg-gray-50 dark:bg-gray-900">
-                                  <File className="w-12 h-12 text-gray-400 dark:text-gray-600" />
-                                </div>
-                              )}
-                              <div className="p-2 border-t border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
-                                <a 
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs font-medium text-green-900 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 truncate block"
-                                >
-                                  {attachment.fileName}
-                                </a>
-                                <p className="text-xs text-green-700 dark:text-green-500">
-                                  {(attachment.fileSize / 1024).toFixed(2)} KB
-                                </p>
+                    {/* Evaluation Side Panel */}
+                    <div className="lg:col-span-1">
+                      {isStudent ? (
+                        // Student View - Read only
+                        submission.status === 'evaluated' ? (
+                          <div className="h-full bg-blue-50 dark:bg-blue-900/20 p-5 rounded-lg border border-blue-200 dark:border-blue-800 flex flex-col">
+                            <div className="mb-6">
+                              <label className="block text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                                Marks Obtained
+                              </label>
+                              <div className="flex items-baseline gap-2">
+                                <span className={`text-4xl font-bold ${(evaluatedAnswer?.marksObtained || 0) >= maxMarks * 0.75 ? 'text-green-600 dark:text-green-400' :
+                                  (evaluatedAnswer?.marksObtained || 0) >= maxMarks * 0.5 ? 'text-yellow-600 dark:text-yellow-400' :
+                                    'text-red-600 dark:text-red-400'
+                                  }`}>
+                                  {evaluatedAnswer?.marksObtained ?? 0}
+                                </span>
+                                <span className="text-xl text-blue-700 dark:text-blue-400 font-medium">/ {maxMarks}</span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
 
-                  {/* Evaluation Section */}
-                  {isStudent ? (
-                    // Student View - Read only
-                    submission.status === 'evaluated' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <div>
-                          <label className="block text-sm font-medium text-muted-foreground mb-2">
-                            Marks Obtained
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-3xl font-bold ${
-                              (evaluatedAnswer?.marksObtained || 0) >= maxMarks * 0.75 ? 'text-green-600 dark:text-green-400' :
-                              (evaluatedAnswer?.marksObtained || 0) >= maxMarks * 0.5 ? 'text-yellow-600 dark:text-yellow-400' :
-                              'text-red-600 dark:text-red-400'
-                            }`}>
-                              {evaluatedAnswer?.marksObtained ?? 0}
-                            </span>
-                            <span className="text-xl text-muted-foreground">/ {maxMarks}</span>
+                            {evaluatedAnswer?.remarks && (
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-blue-900 dark:text-blue-300 mb-2">
+                                  Teacher's Remarks
+                                </label>
+                                <div className="p-4 bg-white dark:bg-gray-900 rounded-lg border border-blue-100 dark:border-blue-800 shadow-sm h-full max-h-[300px] overflow-y-auto">
+                                  <p className="whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                    {evaluatedAnswer.remarks}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-
-                        {evaluatedAnswer?.remarks && (
-                          <div className="md:col-span-2">
+                        ) : (
+                          <div className="h-full flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900/20 rounded-lg border border-dashed p-6 text-center text-muted-foreground">
+                            <Clock className="w-8 h-8 mb-2 opacity-50" />
+                            <p>Evaluation Pending</p>
+                          </div>
+                        )
+                      ) : (
+                        // Teacher View - Editable Form
+                        <div className="h-full bg-white dark:bg-gray-900 p-5 rounded-lg border shadow-sm flex flex-col">
+                          <div className="mb-6">
                             <label className="block text-sm font-medium text-muted-foreground mb-2">
-                              Teacher's Remarks
+                              Marks Obtained <span className="text-red-600 dark:text-red-400">*</span>
                             </label>
-                            <div className="p-3 bg-white dark:bg-gray-900 rounded-lg border">
-                              <p className="whitespace-pre-wrap">
-                                {evaluatedAnswer.remarks}
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                max={maxMarks}
+                                step="0.5"
+                                value={evaluatedAnswer?.marksObtained ?? 0}
+                                onChange={(e) => handleMarksChange(answer.question._id, e.target.value)}
+                                className="text-lg font-medium"
+                              />
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">/ {maxMarks}</span>
                             </div>
+                            {evaluatedAnswer && evaluatedAnswer.marksObtained! > maxMarks && (
+                              <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" />
+                                Cannot exceed maximum marks
+                              </p>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )
-                  ) : (
-                    // Teacher View - Editable
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">
-                          Marks Obtained <span className="text-red-600 dark:text-red-400">*</span>
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            max={maxMarks}
-                            step="0.5"
-                            value={evaluatedAnswer?.marksObtained ?? 0}
-                            onChange={(e) => handleMarksChange(answer.question._id, e.target.value)}
-                            className="w-32"
-                          />
-                          <span className="text-sm text-muted-foreground">/ {maxMarks}</span>
-                        </div>
-                        {evaluatedAnswer && evaluatedAnswer.marksObtained! > maxMarks && (
-                          <p className="text-xs text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Cannot exceed maximum marks
-                          </p>
-                        )}
-                      </div>
 
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-muted-foreground mb-2">
-                          Remarks (Optional)
-                        </label>
-                        <Textarea
-                          value={evaluatedAnswer?.remarks ?? ''}
-                          onChange={(e) => handleRemarksChange(answer.question._id, e.target.value)}
-                          placeholder="Add feedback or comments for the student..."
-                          className="min-h-20"
-                        />
-                      </div>
+                          <div className="flex-1 flex flex-col">
+                            <label className="block text-sm font-medium text-muted-foreground mb-2">
+                              Remarks (Optional)
+                            </label>
+                            <Textarea
+                              value={evaluatedAnswer?.remarks ?? ''}
+                              onChange={(e) => handleRemarksChange(answer.question._id, e.target.value)}
+                              placeholder="Add feedback or comments for the student..."
+                              className="flex-1 min-h-[150px] resize-none"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -775,10 +849,10 @@ const EvaluatePage = () => {
                 <p className="text-xs text-muted-foreground mt-1">
                   {percentage.toFixed(1)}% - {
                     percentage >= 75 ? 'Excellent' :
-                    percentage >= 60 ? 'Good' :
-                    percentage >= 50 ? 'Average' :
-                    percentage >= 35 ? 'Below Average' :
-                    'Needs Improvement'
+                      percentage >= 60 ? 'Good' :
+                        percentage >= 50 ? 'Average' :
+                          percentage >= 35 ? 'Below Average' :
+                            'Needs Improvement'
                   }
                 </p>
               </div>
@@ -817,7 +891,7 @@ const EvaluatePage = () => {
                   )}
                 </Button>
               )}
-              
+
               <Button
                 onClick={handleSubmit}
                 disabled={saving}
@@ -825,7 +899,7 @@ const EvaluatePage = () => {
                 className="bg-green-600 hover:bg-green-700"
               >
                 <Save className="h-5 w-5 mr-2" />
-                {saving ? 'Saving...' : submission.status === 'evaluated' ? 'Update Evaluation' : 'Save Evaluation'}
+                {saving ? 'Saving...' : 'Save Evaluation'}
               </Button>
             </div>
           </div>
